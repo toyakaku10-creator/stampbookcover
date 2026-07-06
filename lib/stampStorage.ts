@@ -27,3 +27,8 @@ export function deleteStamp(id: string): void {
   const stamps = getStamps().filter(s => s.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(stamps));
 }
+
+export function renameStamp(id: string, newName: string): void {
+  const stamps = getStamps().map(s => s.id === id ? { ...s, name: newName } : s);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(stamps));
+}

@@ -6,7 +6,12 @@ export interface Stamp {
   createdAt: string;
 }
 
-export type Tool = 'select' | 'line' | 'rect' | 'circle' | 'triangle' | 'arrow' | 'text';
+export type Tool =
+  | 'select' | 'line' | 'rect' | 'circle' | 'triangle'
+  | 'right-triangle' | 'polygon'
+  | 'h-diamond'
+  | 'trapezoid' | 'arc' | 'dot'
+  | 'text';
 
 export type ArrangementType = 'grid' | 'circular' | 'random' | 'border';
 

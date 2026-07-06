@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', color: 'var(--text)' }} className="flex flex-col items-center justify-center gap-10">
       <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">StampBook Cover</h1>
+        <h1 className="text-3xl font-bold tracking-tight mb-2" style={{ color: '#C9A84C' }}>StampBook Cover</h1>
         <p style={{ color: '#888' }} className="text-sm">スタンプを作成してブックカバーをデザイン</p>
       </div>
       <div className="flex gap-4">

@@ -722,6 +722,11 @@ export default function CoverDesignerPage() {
       const bookStartPxY  = Math.round(imgH * bodyStartYmm / currentTotalH);
       const bookHeightPxY = Math.round(imgH * Math.min(BOOK_H, currentTotalH) / currentTotalH);
 
+      // デバッグ：縦横比確認
+      console.log('切り出し元の縦横比:', spineWidthPx / bookHeightPxY);
+      console.log('描画先の縦横比:', 30 / 268, '(previewSpineW=30固定の場合)');
+      console.log('実際の背表紙の縦横比(mm):', SPINE_W / BOOK_H);
+
       // 固定レイアウト定数
       const TOP = 80;
       const HEIGHT = 260;
@@ -733,9 +738,9 @@ export default function CoverDesignerPage() {
       const SPINE_R = SPINE_L + SPINE_W_PREVIEW; // 320
 
       // 以前の完成版ロジック（左:背表紙、右:表紙）
-      const previewSpineW = 30;
+      const previewSpineW = Math.round(268 * SPINE_W / BOOK_H); // 実際の縦横比に合わせる（≈26px）
       const spineLeft = 90;
-      const spineRight = 120;
+      const spineRight = spineLeft + previewSpineW;
 
       ctx.clearRect(0, 0, pc.width, pc.height);
       ctx.fillStyle = '#E8E8E8';

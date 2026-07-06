@@ -722,10 +722,7 @@ export default function CoverDesignerPage() {
       const bookStartPxY  = Math.round(imgH * bodyStartYmm / currentTotalH);
       const bookHeightPxY = Math.round(imgH * Math.min(BOOK_H, currentTotalH) / currentTotalH);
 
-      // デバッグ：縦横比確認
-      console.log('切り出し元の縦横比:', spineWidthPx / bookHeightPxY);
-      console.log('描画先の縦横比:', 30 / 268, '(previewSpineW=30固定の場合)');
-      console.log('実際の背表紙の縦横比(mm):', SPINE_W / BOOK_H);
+      // デバッグ：縦横比確認（previewSpineWはこの後に定義されるため後ろで出力）
 
       // 固定レイアウト定数
       const TOP = 80;
@@ -742,6 +739,13 @@ export default function CoverDesignerPage() {
       const spineLeft = 90;
       const spineRight = spineLeft + previewSpineW;
 
+      console.log('=== 背表紙の比率チェック ===');
+      console.log('切り出し元: 幅', spineWidthPx, 'px × 高さ', bookHeightPxY, 'px');
+      console.log('切り出し元の比率:', (spineWidthPx / bookHeightPxY).toFixed(4));
+      console.log('描画先: 幅', previewSpineW, 'px × 高さ 268px');
+      console.log('描画先の比率:', (previewSpineW / 268).toFixed(4));
+      console.log('理論値(SPINE_W/BOOK_H):', (SPINE_W / BOOK_H).toFixed(4));
+
       ctx.clearRect(0, 0, pc.width, pc.height);
       ctx.fillStyle = '#E8E8E8';
       ctx.fillRect(0, 0, pc.width, pc.height);
@@ -755,11 +759,11 @@ export default function CoverDesignerPage() {
       ctx.beginPath();
       ctx.moveTo(spineLeft, 55);
       // 背表紙側の辺：外側に膨らむ曲線
-      ctx.quadraticCurveTo(spineLeft + 8, 67, spineRight, 80);
+      ctx.quadraticCurveTo(spineLeft + 8, 62, spineRight, 70);
       // 下辺（手前）
-      ctx.lineTo(spineRight + 200, 80);
+      ctx.lineTo(spineRight + 200, 70);
       // 小口側の辺：外側に膨らむ曲線で上辺へ
-      ctx.quadraticCurveTo(spineRight + 200 - 8, 67, spineRight + 200 - 30, 55);
+      ctx.quadraticCurveTo(spineRight + 200 - 8, 62, spineRight + 200 - 30, 55);
       // 上辺（奥）
       ctx.closePath();
       ctx.fillStyle = '#F0EAE0';
@@ -771,7 +775,7 @@ export default function CoverDesignerPage() {
         const t = i / lineCount;
         // 背表紙側の曲線を補間（quadratic近似）
         const lx = spineLeft + (spineRight - spineLeft) * t + 8 * t * (1 - t) * 2;
-        const ly = 55 + 25 * t;
+        const ly = 55 + 15 * t;
         // 小口側の曲線を補間
         const rx = (spineRight + 200 - 30) + 30 * t - 8 * t * (1 - t) * 2;
         ctx.strokeStyle = i % 4 === 0 ? 'rgba(160,153,143,0.6)' : 'rgba(190,185,178,0.35)';
@@ -790,9 +794,9 @@ export default function CoverDesignerPage() {
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(spineLeft, 55);
-      ctx.quadraticCurveTo(spineLeft - 4, 62, spineRight, 80);
-      ctx.lineTo(spineRight, 340);
-      ctx.quadraticCurveTo(spineLeft - 4, 322, spineLeft, 315);
+      ctx.quadraticCurveTo(spineLeft - 4, 59, spineRight, 70);
+      ctx.lineTo(spineRight, 330);
+      ctx.quadraticCurveTo(spineLeft - 4, 319, spineLeft, 315);
       ctx.closePath();
       ctx.fillStyle = '#1A3358';
       ctx.fill();
@@ -802,23 +806,28 @@ export default function CoverDesignerPage() {
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(spineLeft, 55);
-      ctx.quadraticCurveTo(spineLeft - 4, 62, spineRight, 80);
-      ctx.lineTo(spineRight, 340);
-      ctx.quadraticCurveTo(spineLeft - 4, 322, spineLeft, 315);
+      ctx.quadraticCurveTo(spineLeft - 4, 59, spineRight, 70);
+      ctx.lineTo(spineRight, 330);
+      ctx.quadraticCurveTo(spineLeft - 4, 319, spineLeft, 315);
       ctx.closePath();
       ctx.clip();
-      ctx.transform(1, 25 / previewSpineW, 0, 1, spineLeft, 55);
+      ctx.transform(1, 15 / previewSpineW, 0, 1, spineLeft, 55);
       ctx.scale(-1, 1);
-      ctx.drawImage(img, spineStartPx, bookStartPxY, spineWidthPx, bookHeightPxY,
-        -previewSpineW, -3, previewSpineW, 268);
+      const ZOOM_FIX = 1.5;
+      const OFFSET_FIX = spineWidthPx * 0.15;
+      const sw = spineWidthPx * ZOOM_FIX;
+      const sh = bookHeightPxY * ZOOM_FIX;
+      const sx = spineStartPx - (sw - spineWidthPx) / 2 - OFFSET_FIX;
+      const sy = bookStartPxY - (sh - bookHeightPxY) / 2;
+      ctx.drawImage(img, sx, sy, sw, sh, -previewSpineW, -3, previewSpineW, 268);
       ctx.restore();
 
       // 背表紙：縁取り
       ctx.beginPath();
       ctx.moveTo(spineLeft, 55);
-      ctx.quadraticCurveTo(spineLeft - 4, 62, spineRight, 80);
-      ctx.lineTo(spineRight, 340);
-      ctx.quadraticCurveTo(spineLeft - 4, 322, spineLeft, 315);
+      ctx.quadraticCurveTo(spineLeft - 4, 59, spineRight, 70);
+      ctx.lineTo(spineRight, 330);
+      ctx.quadraticCurveTo(spineLeft - 4, 319, spineLeft, 315);
       ctx.closePath();
       ctx.strokeStyle = '#C0B8A8';
       ctx.lineWidth = 0.8;
@@ -832,25 +841,25 @@ export default function CoverDesignerPage() {
       ctx.fillStyle = edgeShadow;
       ctx.beginPath();
       ctx.moveTo(spineLeft, 55);
-      ctx.quadraticCurveTo(spineLeft - 4, 62, spineRight, 80);
-      ctx.lineTo(spineRight, 340);
-      ctx.quadraticCurveTo(spineLeft - 4, 322, spineLeft, 315);
+      ctx.quadraticCurveTo(spineLeft - 4, 59, spineRight, 70);
+      ctx.lineTo(spineRight, 330);
+      ctx.quadraticCurveTo(spineLeft - 4, 319, spineLeft, 315);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
 
       // 表紙：白塗り + 縁取り
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(spineRight, 80, 200, 260);
+      ctx.fillRect(spineRight, 70, 200, 260);
       ctx.strokeStyle = '#C0B8A8';
       ctx.lineWidth = 0.8;
-      ctx.strokeRect(spineRight, 80, 200, 260);
+      ctx.strokeRect(spineRight, 70, 200, 260);
 
       // 表紙：画像（鏡文字打ち消し）
       ctx.save();
       ctx.scale(-1, 1);
       ctx.drawImage(img, frontStartPx, bookStartPxY, frontWidthPx, bookHeightPxY,
-        -(spineRight + 200), 80, 200, 260);
+        -(spineRight + 200), 70, 200, 260);
       ctx.restore();
 
       ctx.restore();

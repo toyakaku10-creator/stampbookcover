@@ -820,7 +820,7 @@ export default function CoverDesignerPage() {
       ctx.closePath();
       ctx.clip();
       ctx.transform(1, 15 / previewSpineW, 0, 1, spineLeft, 55);
-      const SHEAR_COMPENSATE = 90;
+      const SHEAR_COMPENSATE = 80;
       ctx.beginPath();
       ctx.rect(0, 80 - SHEAR_COMPENSATE, previewSpineW, 260);
       ctx.clip();

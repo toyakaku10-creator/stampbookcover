@@ -813,12 +813,15 @@ export default function CoverDesignerPage() {
       ctx.clip();
       ctx.transform(1, 15 / previewSpineW, 0, 1, spineLeft, 55);
       ctx.scale(-1, 1);
-      const ZOOM_FIX = 1.5;
-      const OFFSET_FIX = spineWidthPx * 0.15;
+      const frontScale = 200 / frontWidthPx;
+      const correctSpineDisplayW = spineWidthPx * frontScale;
+      const ZOOM_FIX = previewSpineW / correctSpineDisplayW;
       const sw = spineWidthPx * ZOOM_FIX;
       const sh = bookHeightPxY * ZOOM_FIX;
-      const sx = spineStartPx - (sw - spineWidthPx) / 2 - OFFSET_FIX;
+      const OFFSET = spineWidthPx * 0.1;
+      const sx = spineStartPx - (sw - spineWidthPx) / 2 - OFFSET;
       const sy = bookStartPxY - (sh - bookHeightPxY) / 2;
+      console.log('ZOOM_FIX(理論値):', ZOOM_FIX.toFixed(3));
       ctx.drawImage(img, sx, sy, sw, sh, -previewSpineW, -3, previewSpineW, 268);
       ctx.restore();
 
@@ -856,9 +859,12 @@ export default function CoverDesignerPage() {
       ctx.strokeRect(spineRight, 70, 200, 260);
 
       // 表紙：画像（鏡文字打ち消し）
+      // 背表紙の切り出しが表紙側に食い込んだ分を削る
+      const spineOverlap = (sw - spineWidthPx) / 2 + OFFSET;
+      const frontWidthPxAdjusted = frontWidthPx - spineOverlap;
       ctx.save();
       ctx.scale(-1, 1);
-      ctx.drawImage(img, frontStartPx, bookStartPxY, frontWidthPx, bookHeightPxY,
+      ctx.drawImage(img, frontStartPx, bookStartPxY, frontWidthPxAdjusted, bookHeightPxY,
         -(spineRight + 200), 70, 200, 260);
       ctx.restore();
 

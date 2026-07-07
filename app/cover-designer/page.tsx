@@ -686,10 +686,13 @@ export default function CoverDesignerPage() {
   // ── プレビュー ────────────────────────────────────────────────────
   const openPreview = useCallback(() => {
     if (!fabricRef.current) return;
-    const dataUrl = fabricRef.current.toDataURL({ format: 'jpeg', quality: 1.0, multiplier: 1 });
+    const realWpx = Math.round(currentTotalW / 25.4 * DPI);
+    const dispW = fabricRef.current.getWidth();
+    const multiplier = realWpx / dispW;
+    const dataUrl = fabricRef.current.toDataURL({ format: 'jpeg', quality: 1.0, multiplier });
     setPreviewDataUrl(dataUrl);
     setShowPreview(true);
-  }, []);
+  }, [currentTotalW]);
 
   const drawPreview = useCallback((dataUrl: string) => {
     const pc = previewCanvasRef.current;
@@ -699,6 +702,9 @@ export default function CoverDesignerPage() {
     const img = new Image();
     img.onload = () => {
       const imgW = img.width, imgH = img.height;
+      console.log('preview canvas:', pc.width, pc.height);
+      console.log('img size:', imgW, imgH);
+      console.log('devicePixelRatio:', window.devicePixelRatio);
 
       const flapH = (currentTotalW - BOOK_W * 2 - SPINE_W) / 2;
       // デバッグ：背表紙の切り出し位置確認
@@ -858,6 +864,12 @@ export default function CoverDesignerPage() {
       // 背表紙の切り出しが表紙側に食い込んだ分を削る
       const spineOverlap = (sw - spineWidthPx) / 2 + OFFSET;
       const frontWidthPxAdjusted = frontWidthPx - spineOverlap;
+      console.log('=== 切り出し範囲 ===');
+      console.log('表紙 x:', frontStartPx, '〜', frontStartPx + frontWidthPxAdjusted);
+      console.log('背表紙 sx:', sx, '〜', sx + sw);
+      console.log('この2つが連続しているべき（表紙の右端 ≒ 背表紙の左端）');
+      console.log('表紙 y:', bookStartPxY, '〜', bookStartPxY + bookHeightPxY);
+      console.log('背表紙 sy:（表紙と同じはず）', bookStartPxY, '〜', bookStartPxY + bookHeightPxY);
       ctx.save();
       ctx.scale(-1, 1);
       ctx.drawImage(img, frontStartPx, bookStartPxY, frontWidthPxAdjusted, bookHeightPxY,

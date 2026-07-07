@@ -815,10 +815,10 @@ export default function CoverDesignerPage() {
       ctx.clip();
       ctx.transform(1, 15 / previewSpineW, 0, 1, spineLeft, 55);
       ctx.beginPath();
-      ctx.rect(0, dyFixed, previewSpineW, dhFixed);
+      ctx.rect(0, 80, previewSpineW, 260);
       ctx.clip();
       ctx.scale(-1, 1);
-      ctx.drawImage(img, sx, syFixed, sw, shFixed, -previewSpineW, dyFixed, previewSpineW, dhFixed);
+      ctx.drawImage(img, sx, bookStartPxY, sw, bookHeightPxY, -previewSpineW, 80, previewSpineW, 260);
       ctx.restore();
 
       // 背表紙：縁取り

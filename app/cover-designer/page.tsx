@@ -800,7 +800,7 @@ export default function CoverDesignerPage() {
       const sx = spineStartPx - (sw - spineWidthPx) / 2 - OFFSET;
       const syFixed = bookStartPxY - (shFixed - bookHeightPxY) / 2;
       const displayHeightExtra = 260 * (ZOOM_FIX - 1);
-      const dyFixed = 70 - displayHeightExtra / 2;
+      const dyFixed = 80 - displayHeightExtra / 2;
       const dhFixed = 260 + displayHeightExtra;
       console.log('ZOOM_FIX(理論値):', ZOOM_FIX.toFixed(3), 'dyFixed:', dyFixed.toFixed(1), 'dhFixed:', dhFixed.toFixed(1));
 

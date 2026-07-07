@@ -391,8 +391,10 @@ export default function CoverDesignerPage() {
 
       // クリック配置
       canvas.on('mouse:up', (e: any) => {
-        if (!e.pointer) return;
-        const { x, y } = e.pointer;
+        console.log('mouse:up fired, activeTool:', activeToolRef.current, 'scenePoint:', e.scenePoint);
+        const pt = e.scenePoint ?? e.pointer;
+        if (!pt) return;
+        const { x, y } = pt;
         const tool = activeToolRef.current;
 
         // スタンプ配置

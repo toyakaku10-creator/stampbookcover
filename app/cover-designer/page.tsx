@@ -801,7 +801,7 @@ export default function CoverDesignerPage() {
       ctx.clip();
       ctx.transform(1, 15 / previewSpineW, 0, 1, spineLeft, 55);
       ctx.beginPath();
-      ctx.rect(0, -20, previewSpineW, 305);
+      ctx.rect(0, -35, previewSpineW, 340);
       ctx.clip();
       ctx.scale(-1, 1);
       const frontScale = 200 / frontWidthPx;
@@ -813,7 +813,7 @@ export default function CoverDesignerPage() {
       const sx = spineStartPx - (sw - spineWidthPx) / 2 - OFFSET;
       const sy = bookStartPxY - (sh - bookHeightPxY) / 2;
       console.log('ZOOM_FIX(理論値):', ZOOM_FIX.toFixed(3));
-      ctx.drawImage(img, sx, sy, sw, sh, -previewSpineW, -20, previewSpineW, 305);
+      ctx.drawImage(img, sx, sy, sw, sh, -previewSpineW, -35, previewSpineW, 340);
       ctx.restore();
 
       // 背表紙：縁取り

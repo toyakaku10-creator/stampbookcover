@@ -822,7 +822,7 @@ export default function CoverDesignerPage() {
       const sx = spineStartPx - (sw - spineWidthPx) / 2 - OFFSET;
       const sy = bookStartPxY - (sh - bookHeightPxY) / 2;
       console.log('ZOOM_FIX(理論値):', ZOOM_FIX.toFixed(3));
-      ctx.drawImage(img, sx, sy, sw, sh, -previewSpineW, -3, previewSpineW, 268);
+      ctx.drawImage(img, sx, sy, sw, sh, -previewSpineW, -10, previewSpineW, 285);
       ctx.restore();
 
       // 背表紙：縁取り

@@ -790,18 +790,6 @@ export default function CoverDesignerPage() {
       ctx.lineWidth = 0.8;
       ctx.stroke();
 
-      // 背表紙：塗りつぶし
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(spineLeft, 55);
-      ctx.quadraticCurveTo(spineLeft - 4, 59, spineRight, 70);
-      ctx.lineTo(spineRight, 330);
-      ctx.quadraticCurveTo(spineLeft - 4, 319, spineLeft, 315);
-      ctx.closePath();
-      ctx.fillStyle = '#1A3358';
-      ctx.fill();
-      ctx.restore();
-
       // 背表紙：画像（スパイン形状にクリップして描画）
       ctx.save();
       ctx.beginPath();

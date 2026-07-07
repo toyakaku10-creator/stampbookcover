@@ -790,6 +790,20 @@ export default function CoverDesignerPage() {
       ctx.lineWidth = 0.8;
       ctx.stroke();
 
+      // 背表紙：描画パラメータ（clipより先に計算）
+      const frontScale = 200 / frontWidthPx;
+      const correctSpineDisplayW = spineWidthPx * frontScale;
+      const ZOOM_FIX = previewSpineW / correctSpineDisplayW;
+      const sw = spineWidthPx * ZOOM_FIX;
+      const shFixed = bookHeightPxY * ZOOM_FIX;
+      const OFFSET = spineWidthPx * 0.1;
+      const sx = spineStartPx - (sw - spineWidthPx) / 2 - OFFSET;
+      const syFixed = bookStartPxY - (shFixed - bookHeightPxY) / 2;
+      const displayHeightExtra = 260 * (ZOOM_FIX - 1);
+      const dyFixed = 70 - displayHeightExtra / 2;
+      const dhFixed = 260 + displayHeightExtra;
+      console.log('ZOOM_FIX(理論値):', ZOOM_FIX.toFixed(3), 'dyFixed:', dyFixed.toFixed(1), 'dhFixed:', dhFixed.toFixed(1));
+
       // 背表紙：画像（スパイン形状にクリップして描画）
       ctx.save();
       ctx.beginPath();
@@ -801,19 +815,10 @@ export default function CoverDesignerPage() {
       ctx.clip();
       ctx.transform(1, 15 / previewSpineW, 0, 1, spineLeft, 55);
       ctx.beginPath();
-      ctx.rect(0, -35, previewSpineW, 340);
+      ctx.rect(0, dyFixed, previewSpineW, dhFixed);
       ctx.clip();
       ctx.scale(-1, 1);
-      const frontScale = 200 / frontWidthPx;
-      const correctSpineDisplayW = spineWidthPx * frontScale;
-      const ZOOM_FIX = previewSpineW / correctSpineDisplayW;
-      const sw = spineWidthPx * ZOOM_FIX;
-      const sh = bookHeightPxY * ZOOM_FIX;
-      const OFFSET = spineWidthPx * 0.1;
-      const sx = spineStartPx - (sw - spineWidthPx) / 2 - OFFSET;
-      const sy = bookStartPxY - (sh - bookHeightPxY) / 2;
-      console.log('ZOOM_FIX(理論値):', ZOOM_FIX.toFixed(3));
-      ctx.drawImage(img, sx, sy, sw, sh, -previewSpineW, -35, previewSpineW, 340);
+      ctx.drawImage(img, sx, syFixed, sw, shFixed, -previewSpineW, dyFixed, previewSpineW, dhFixed);
       ctx.restore();
 
       // 背表紙：縁取り

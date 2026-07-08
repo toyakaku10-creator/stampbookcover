@@ -299,8 +299,10 @@ export default function CoverDesignerPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const canvas = fabricRef.current as any;
     if (!canvas) return;
-    const canvasEl: HTMLCanvasElement = canvas.getElement?.() ?? canvas.lowerCanvasEl;
+    // Fabric.js v7ではイベントはupperCanvasElで処理される
+    const canvasEl: HTMLCanvasElement = canvas.upperCanvasEl ?? canvas.getElement?.() ?? canvas.lowerCanvasEl;
     if (!canvasEl) return;
+    console.log('エリア選択: canvasEl取得', canvasEl.tagName, canvasEl.width, canvasEl.height);
 
     const getPtr = (e: MouseEvent) => {
       const rect = canvasEl.getBoundingClientRect();
@@ -310,7 +312,10 @@ export default function CoverDesignerPage() {
       };
     };
 
-    const onDown = (e: MouseEvent) => { dragStartRef.current = getPtr(e); };
+    const onDown = (e: MouseEvent) => {
+      dragStartRef.current = getPtr(e);
+      console.log('エリア選択: mousedown', dragStartRef.current);
+    };
     const onUp   = (e: MouseEvent) => {
       if (!dragStartRef.current) return;
       const end = getPtr(e);
@@ -318,6 +323,7 @@ export default function CoverDesignerPage() {
       const top    = Math.min(dragStartRef.current.y, end.y);
       const width  = Math.abs(end.x - dragStartRef.current.x);
       const height = Math.abs(end.y - dragStartRef.current.y);
+      console.log('エリア選択: mouseup', { left, top, width, height });
       if (width > 5 && height > 5) setCustomArea({ left, top, width, height });
       dragStartRef.current = null;
       setIsAreaSelecting(false);

@@ -309,13 +309,16 @@ export default function CoverDesignerPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabric: any = canvas._fabric;
     if (!fabric) return;
-    const canvasEl = canvas.getElement() as HTMLCanvasElement;
-    if (!canvasEl) return;
+    // Fabric.js v7: イベントは upperCanvasEl で処理される（getElement は lower canvas を返す）
+    const eventEl: HTMLCanvasElement = canvas.upperCanvasEl ?? canvas.getElement();
+    if (!eventEl) return;
+    // 座標計算は upperCanvasEl の getBoundingClientRect を使う（Fabric.js 内部と同じ）
+    const coordEl: HTMLCanvasElement = canvas.upperCanvasEl ?? canvas.getElement();
 
     const getCanvasPointer = (e: MouseEvent) => {
-      const rect = canvasEl.getBoundingClientRect();
-      const scaleX = canvasEl.width / rect.width;
-      const scaleY = canvasEl.height / rect.height;
+      const rect = coordEl.getBoundingClientRect();
+      const scaleX = coordEl.width / rect.width;
+      const scaleY = coordEl.height / rect.height;
       return {
         x: (e.clientX - rect.left) * scaleX,
         y: (e.clientY - rect.top) * scaleY,
@@ -377,11 +380,11 @@ export default function CoverDesignerPage() {
       canvas.renderAll();
     };
 
-    canvasEl.addEventListener('mousedown', handleDown);
+    eventEl.addEventListener('mousedown', handleDown);
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
     return () => {
-      canvasEl.removeEventListener('mousedown', handleDown);
+      eventEl.removeEventListener('mousedown', handleDown);
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
       if (dragRectRef.current && fabricRef.current) {

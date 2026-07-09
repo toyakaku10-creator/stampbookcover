@@ -573,8 +573,6 @@ export default function CoverDesignerPage() {
         if (naturalSize > 0) group.scale(stampSize / naturalSize);
         canvas.add(group);
       }
-      canvas.renderAll();
-      saveHistoryRef.current();
       // 配置後に点線枠を削除（strokeDashArrayを持つ全オブジェクトを対象）
       if (fabricRef.current) {
         const dashedObjects = fabricRef.current.getObjects().filter((obj: any) =>
@@ -582,8 +580,9 @@ export default function CoverDesignerPage() {
         );
         dashedObjects.forEach((obj: any) => fabricRef.current.remove(obj));
         areaRectRef.current = null;
-        fabricRef.current.renderAll();
       }
+      canvas.renderAll();
+      saveHistoryRef.current();
       setCustomArea(null);
     };
 

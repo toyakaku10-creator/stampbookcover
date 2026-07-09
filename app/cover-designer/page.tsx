@@ -575,10 +575,10 @@ export default function CoverDesignerPage() {
       canvas.renderAll();
       saveHistoryRef.current();
       // 配置後に点線枠を削除
-      if (areaRectRef.current) {
-        canvas.remove(areaRectRef.current);
+      if (areaRectRef.current && fabricRef.current) {
+        fabricRef.current.remove(areaRectRef.current);
         areaRectRef.current = null;
-        canvas.renderAll();
+        fabricRef.current.renderAll();
       }
       setCustomArea(null);
     };

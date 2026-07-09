@@ -218,6 +218,17 @@ export default function CoverDesignerPage() {
     }
   };
 
+  const startAreaSelect = () => {
+    if (fabricRef.current) {
+      fabricRef.current.selection = false;
+      fabricRef.current.discardActiveObject();
+      fabricRef.current.renderAll();
+    }
+    isAreaSelectingRef.current = true;
+    setIsAreaSelecting(true);
+    setAreaMode('custom');
+  };
+
   useEffect(() => { setStamps(getStamps()); }, []);
   useEffect(() => { stampsRef.current = stamps; }, [stamps]);
   useEffect(() => { stampSizeRef.current = stampSize; }, [stampSize]);
@@ -424,6 +435,7 @@ export default function CoverDesignerPage() {
           }
           isAreaSelectingRef.current = false;
           setIsAreaSelecting(false);
+          canvas.selection = true;
           canvas.renderAll();
           return;
         }
@@ -1072,11 +1084,11 @@ export default function CoverDesignerPage() {
               <div style={{ fontSize: 10, color: '#888' }}>配置エリア</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer' }}>
-                  <input type="radio" checked={areaMode === 'full'} onChange={() => { setAreaMode('full'); setIsAreaSelecting(false); isAreaSelectingRef.current = false; }} />
+                  <input type="radio" checked={areaMode === 'full'} onChange={() => { setAreaMode('full'); setIsAreaSelecting(false); isAreaSelectingRef.current = false; if (fabricRef.current) { fabricRef.current.selection = true; fabricRef.current.renderAll(); } }} />
                   全体
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer' }}>
-                  <input type="radio" checked={areaMode === 'custom'} onChange={() => { setAreaMode('custom'); setIsAreaSelecting(true); isAreaSelectingRef.current = true; }} />
+                  <input type="radio" checked={areaMode === 'custom'} onChange={startAreaSelect} />
                   エリア指定
                 </label>
               </div>
@@ -1088,7 +1100,7 @@ export default function CoverDesignerPage() {
                       ? (
                         <span>
                           {Math.round(customArea.width)}×{Math.round(customArea.height)}px
-                          <button onClick={() => { setIsAreaSelecting(true); isAreaSelectingRef.current = true; }}
+                          <button onClick={startAreaSelect}
                             style={{ marginLeft: 6, fontSize: 9, color: '#C9A84C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                             再選択
                           </button>

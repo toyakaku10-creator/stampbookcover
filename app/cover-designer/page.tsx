@@ -400,6 +400,37 @@ export default function CoverDesignerPage() {
         const p = getPt(opt);
         dragStartRef.current = { x: p.x, y: p.y };
         isDraggingRef.current = true;
+        if (areaRectRef.current) {
+          canvas.remove(areaRectRef.current);
+        }
+        const rect = new fabric.Rect({
+          left: p.x,
+          top: p.y,
+          width: 0,
+          height: 0,
+          fill: 'rgba(201,168,76,0.15)',
+          stroke: '#C9A84C',
+          strokeWidth: 2,
+          strokeDashArray: [8, 4],
+          selectable: false,
+          evented: false,
+        });
+        areaRectRef.current = rect;
+        canvas.add(rect);
+        canvas.bringObjectToFront(rect);
+      });
+
+      canvas.on('mouse:move', (opt: any) => {
+        if (!isDraggingRef.current || !dragStartRef.current) return;
+        const p = getPt(opt);
+        const left = Math.min(dragStartRef.current.x, p.x);
+        const top = Math.min(dragStartRef.current.y, p.y);
+        const width = Math.abs(p.x - dragStartRef.current.x);
+        const height = Math.abs(p.y - dragStartRef.current.y);
+        if (areaRectRef.current) {
+          areaRectRef.current.set({ left, top, width, height });
+          canvas.renderAll();
+        }
       });
 
       // スタンプ・図形配置 & エリア選択完了

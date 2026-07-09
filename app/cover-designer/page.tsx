@@ -301,10 +301,9 @@ export default function CoverDesignerPage() {
     canvas.renderAll();
   }, []);
 
-  // isAreaSelectingRef を isAreaSelecting state に同期
-  useEffect(() => {
-    isAreaSelectingRef.current = isAreaSelecting;
-  }, [isAreaSelecting]);
+  // ── ハンドラ用ref同期 ───────────────────────────────────────────
+  useEffect(() => { isAreaSelectingRef.current = isAreaSelecting; }, [isAreaSelecting]);
+  useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
 
   // areaMode が 'full' に戻ったとき点線枠を削除
   useEffect(() => {
@@ -373,25 +372,25 @@ export default function CoverDesignerPage() {
       canvas.on('selection:updated', () => updateSelPropsRef.current());
       canvas.on('selection:cleared', () => setHasSelection(false));
 
-      // エリア指定ドラッグ（fabric内部座標を使って正確に一致させる）
+      // エリア指定ドラッグ（fabric内部座標 + ref参照でクロージャ問題を回避）
       canvas.on('mouse:down', (opt: any) => {
-        if (!isAreaSelectingRef.current) return;
         const p = canvas.getPointer(opt.e);
-        dragStartRef.current = { x: p.x, y: p.y };
-        isDraggingRef.current = true;
-        if (areaRectRef.current) canvas.remove(areaRectRef.current);
-        const rect = new fabric.Rect({
-          left: p.x, top: p.y, width: 0, height: 0,
-          fill: 'transparent',
-          stroke: '#C9A84C',
-          strokeWidth: 1.5,
-          strokeDashArray: [6, 4],
-          selectable: false,
-          evented: false,
-        });
-        areaRectRef.current = rect;
-        canvas.add(rect);
-        canvas.renderAll();
+        if (isAreaSelectingRef.current) {
+          dragStartRef.current = { x: p.x, y: p.y };
+          isDraggingRef.current = true;
+          if (areaRectRef.current) canvas.remove(areaRectRef.current);
+          const rect = new fabric.Rect({
+            left: p.x, top: p.y, width: 0, height: 0,
+            fill: 'transparent',
+            stroke: '#C9A84C',
+            strokeWidth: 1.5,
+            strokeDashArray: [6, 4],
+            selectable: false,
+            evented: false,
+          });
+          areaRectRef.current = rect;
+          canvas.add(rect);
+        }
       });
 
       canvas.on('mouse:move', (opt: any) => {
@@ -405,16 +404,16 @@ export default function CoverDesignerPage() {
         canvas.renderAll();
       });
 
-      // クリック配置
+      // スタンプ・図形配置 & エリア選択完了
       canvas.on('mouse:up', (opt: any) => {
-        // エリア選択完了
+        const p = canvas.getPointer(opt.e);
+
+        // エリア選択のドラッグ終了
         if (isDraggingRef.current && dragStartRef.current) {
-          const p = canvas.getPointer(opt.e);
           const left = Math.min(dragStartRef.current.x, p.x);
           const top = Math.min(dragStartRef.current.y, p.y);
           const width = Math.abs(p.x - dragStartRef.current.x);
           const height = Math.abs(p.y - dragStartRef.current.y);
-          // ドラッグ完全終了
           isDraggingRef.current = false;
           dragStartRef.current = null;
           if (width > 5 && height > 5) {
@@ -423,18 +422,18 @@ export default function CoverDesignerPage() {
             if (areaRectRef.current) { canvas.remove(areaRectRef.current); areaRectRef.current = null; }
             setCustomArea(null);
           }
-          // 選択モードを自動OFF（1回ドラッグしたら終わり）
           isAreaSelectingRef.current = false;
           setIsAreaSelecting(false);
           canvas.renderAll();
           return;
         }
-        const e = opt;
-        console.log('mouse:up fired, activeTool:', activeToolRef.current, 'scenePoint:', e.scenePoint);
-        const pt = e.scenePoint ?? e.pointer;
+
+        // 通常のスタンプ・図形配置（ref参照で最新のtoolを取得）
+        const tool = activeToolRef.current;
+        if (tool === 'select') return;
+        const pt = opt.scenePoint ?? opt.pointer;
         if (!pt) return;
         const { x, y } = pt;
-        const tool = activeToolRef.current;
 
         // スタンプ配置
         if (tool.startsWith('stamp-')) {
@@ -1073,11 +1072,11 @@ export default function CoverDesignerPage() {
               <div style={{ fontSize: 10, color: '#888' }}>配置エリア</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer' }}>
-                  <input type="radio" checked={areaMode === 'full'} onChange={() => { setAreaMode('full'); setIsAreaSelecting(false); }} />
+                  <input type="radio" checked={areaMode === 'full'} onChange={() => { setAreaMode('full'); setIsAreaSelecting(false); isAreaSelectingRef.current = false; }} />
                   全体
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer' }}>
-                  <input type="radio" checked={areaMode === 'custom'} onChange={() => { setAreaMode('custom'); setIsAreaSelecting(true); }} />
+                  <input type="radio" checked={areaMode === 'custom'} onChange={() => { setAreaMode('custom'); setIsAreaSelecting(true); isAreaSelectingRef.current = true; }} />
                   エリア指定
                 </label>
               </div>
@@ -1089,7 +1088,7 @@ export default function CoverDesignerPage() {
                       ? (
                         <span>
                           {Math.round(customArea.width)}×{Math.round(customArea.height)}px
-                          <button onClick={() => setIsAreaSelecting(true)}
+                          <button onClick={() => { setIsAreaSelecting(true); isAreaSelectingRef.current = true; }}
                             style={{ marginLeft: 6, fontSize: 9, color: '#C9A84C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                             再選択
                           </button>

@@ -579,6 +579,8 @@ export default function CoverDesignerPage() {
         fabricRef.current.remove(areaRectRef.current);
         areaRectRef.current = null;
         fabricRef.current.renderAll();
+      } else {
+        alert('点線削除がスキップされました');
       }
       setCustomArea(null);
     };

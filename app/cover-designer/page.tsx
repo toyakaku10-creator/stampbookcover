@@ -421,6 +421,8 @@ export default function CoverDesignerPage() {
         areaRectRef.current = rect;
         canvas.add(rect);
         canvas.bringObjectToFront(rect);
+        ;(rect as any)._debugId = 'AREA_RECT_' + Date.now();
+        console.log('点線を追加したcanvasと fabricRef.current が同一か:', canvas === fabricRef.current);
       });
 
       canvas.on('mouse:move', (opt: any) => {
@@ -575,9 +577,11 @@ export default function CoverDesignerPage() {
       }
       // 配置後に点線枠を削除（strokeDashArrayを持つ全オブジェクトを対象）
       if (fabricRef.current) {
-        const dashedObjects = fabricRef.current.getObjects().filter((obj: any) =>
+        const allObjects = fabricRef.current.getObjects();
+        const dashedObjects = allObjects.filter((obj: any) =>
           obj.strokeDashArray && obj.strokeDashArray.length > 0
         );
+        console.log('placeAtで見えている全オブジェクト数:', allObjects.length, '点線数:', dashedObjects.length);
         dashedObjects.forEach((obj: any) => fabricRef.current.remove(obj));
         areaRectRef.current = null;
       }

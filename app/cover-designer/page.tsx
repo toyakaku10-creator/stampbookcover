@@ -220,7 +220,7 @@ export default function CoverDesignerPage() {
 
   const startAreaSelect = () => {
     if (fabricRef.current) {
-      fabricRef.current.selection = true;
+      fabricRef.current.selection = false;
       fabricRef.current.discardActiveObject();
       fabricRef.current.renderAll();
     }
@@ -383,25 +383,68 @@ export default function CoverDesignerPage() {
       canvas.on('selection:updated', () => updateSelPropsRef.current());
       canvas.on('selection:cleared', () => setHasSelection(false));
 
-      canvas.on('mouse:down', (_opt: any) => {
-        // エリア指定モード中はFabricのmarquee選択をそのまま使う
+      // エリア指定ドラッグ用座標取得（getScenePoint優先）
+      const getPt = (opt: any) => {
+        try {
+          if (typeof canvas.getScenePoint === 'function') {
+            return canvas.getScenePoint(opt.e);
+          }
+        } catch (e) {
+          console.error('getScenePoint failed:', e);
+        }
+        return opt.scenePoint ?? { x: 0, y: 0 };
+      };
+
+      canvas.on('mouse:down', (opt: any) => {
+        console.log('getScenePoint存在:', typeof canvas.getScenePoint);
+        console.log('getScenePoint結果:', typeof canvas.getScenePoint === 'function' ? canvas.getScenePoint(opt.e) : 'N/A');
+        console.log('opt.scenePoint:', opt.scenePoint);
+        if (!isAreaSelectingRef.current) return;
+        const p = getPt(opt);
+        dragStartRef.current = { x: p.x, y: p.y };
+        isDraggingRef.current = true;
+        if (areaRectRef.current) canvas.remove(areaRectRef.current);
+        const rect = new fabric.Rect({
+          left: p.x, top: p.y, width: 0, height: 0,
+          fill: 'transparent',
+          stroke: '#C9A84C',
+          strokeWidth: 1.5,
+          strokeDashArray: [6, 4],
+          selectable: false,
+          evented: false,
+        });
+        areaRectRef.current = rect;
+        canvas.add(rect);
+      });
+
+      canvas.on('mouse:move', (opt: any) => {
+        if (!isDraggingRef.current || !dragStartRef.current || !areaRectRef.current) return;
+        const p = getPt(opt);
+        const left = Math.min(dragStartRef.current.x, p.x);
+        const top = Math.min(dragStartRef.current.y, p.y);
+        const width = Math.abs(p.x - dragStartRef.current.x);
+        const height = Math.abs(p.y - dragStartRef.current.y);
+        areaRectRef.current.set({ left, top, width, height });
+        canvas.renderAll();
       });
 
       // スタンプ・図形配置 & エリア選択完了
       canvas.on('mouse:up', (opt: any) => {
-        // エリア選択完了：marqueeで選ばれたオブジェクト群のbounding rectをエリアとして使用
-        if (isAreaSelectingRef.current) {
-          const activeObjects = canvas.getActiveObjects();
-          if (activeObjects.length > 0) {
-            const group = new fabric.ActiveSelection(activeObjects, { canvas });
-            const bound = group.getBoundingRect();
-            setCustomArea({ left: bound.left, top: bound.top, width: bound.width, height: bound.height });
-            canvas.discardActiveObject();
-          }
+        // エリア選択のドラッグ終了
+        if (isDraggingRef.current && dragStartRef.current) {
+          const p = getPt(opt);
+          const left = Math.min(dragStartRef.current.x, p.x);
+          const top = Math.min(dragStartRef.current.y, p.y);
+          const width = Math.abs(p.x - dragStartRef.current.x);
+          const height = Math.abs(p.y - dragStartRef.current.y);
           isDraggingRef.current = false;
           dragStartRef.current = null;
-          setIsAreaSelecting(false);
-          isAreaSelectingRef.current = false;
+          if (width > 5 && height > 5) {
+            setCustomArea({ left, top, width, height });
+          } else {
+            if (areaRectRef.current) { canvas.remove(areaRectRef.current); areaRectRef.current = null; }
+            setCustomArea(null);
+          }
           canvas.renderAll();
           return;
         }

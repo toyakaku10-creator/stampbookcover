@@ -428,7 +428,7 @@ export default function CoverDesignerPage() {
         const height = Math.abs(p.y - dragStartRef.current.y);
         areaRectRef.current.set({ left, top, width, height });
         canvas.renderAll();
-        console.log('rect.left/top (更新後):', areaRectRef.current?.left, areaRectRef.current?.top);
+        console.log('rect更新後:', 'left:', areaRectRef.current?.left, 'top:', areaRectRef.current?.top, 'width:', areaRectRef.current?.width, 'height:', areaRectRef.current?.height);
       });
 
       // スタンプ・図形配置 & エリア選択完了

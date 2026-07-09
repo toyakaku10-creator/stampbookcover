@@ -384,12 +384,9 @@ export default function CoverDesignerPage() {
       canvas.on('selection:cleared', () => setHasSelection(false));
 
       // エリア指定ドラッグ（fabric内部座標 + ref参照でクロージャ問題を回避）
-      // scenePointはcanvasEl.width基準で返るため、Fabric論理座標(canvas.width)に補正する
       const getPt = (opt: any) => {
         const pt = opt.scenePoint;
-        if (!pt) return { x: 0, y: 0 };
-        const ratio = (canvas.getElement().width as number) / (canvas.width as number);
-        return { x: (pt.x as number) / ratio, y: (pt.y as number) / ratio };
+        return pt ? { x: pt.x as number, y: pt.y as number } : { x: 0, y: 0 };
       };
 
       canvas.on('mouse:down', (opt: any) => {

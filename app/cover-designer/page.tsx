@@ -307,12 +307,9 @@ export default function CoverDesignerPage() {
 
   // areaMode が 'full' に戻ったとき点線枠を削除
   useEffect(() => {
-    if (areaMode !== 'custom' && fabricRef.current) {
-      if (areaRectRef.current) {
-        fabricRef.current.remove(areaRectRef.current);
-        areaRectRef.current = null;
-      }
-      fabricRef.current.selection = true;
+    if (areaMode !== 'custom' && areaRectRef.current && fabricRef.current) {
+      fabricRef.current.remove(areaRectRef.current);
+      areaRectRef.current = null;
       fabricRef.current.renderAll();
     }
   }, [areaMode]);
@@ -379,8 +376,6 @@ export default function CoverDesignerPage() {
       canvas.on('mouse:down', (opt: any) => {
         const p = canvas.getPointer(opt.e);
         if (isAreaSelectingRef.current) {
-          canvas.selection = false;
-          canvas.discardActiveObject();
           dragStartRef.current = { x: p.x, y: p.y };
           isDraggingRef.current = true;
           if (areaRectRef.current) canvas.remove(areaRectRef.current);
@@ -429,7 +424,6 @@ export default function CoverDesignerPage() {
           }
           isAreaSelectingRef.current = false;
           setIsAreaSelecting(false);
-          canvas.selection = true;
           canvas.renderAll();
           return;
         }
@@ -1078,11 +1072,11 @@ export default function CoverDesignerPage() {
               <div style={{ fontSize: 10, color: '#888' }}>配置エリア</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer' }}>
-                  <input type="radio" checked={areaMode === 'full'} onChange={() => { setAreaMode('full'); setIsAreaSelecting(false); isAreaSelectingRef.current = false; if (fabricRef.current) fabricRef.current.selection = true; }} />
+                  <input type="radio" checked={areaMode === 'full'} onChange={() => { setAreaMode('full'); setIsAreaSelecting(false); isAreaSelectingRef.current = false; }} />
                   全体
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer' }}>
-                  <input type="radio" checked={areaMode === 'custom'} onChange={() => { setAreaMode('custom'); setIsAreaSelecting(true); isAreaSelectingRef.current = true; if (fabricRef.current) fabricRef.current.selection = false; }} />
+                  <input type="radio" checked={areaMode === 'custom'} onChange={() => { setAreaMode('custom'); setIsAreaSelecting(true); isAreaSelectingRef.current = true; }} />
                   エリア指定
                 </label>
               </div>
@@ -1094,7 +1088,7 @@ export default function CoverDesignerPage() {
                       ? (
                         <span>
                           {Math.round(customArea.width)}×{Math.round(customArea.height)}px
-                          <button onClick={() => { setIsAreaSelecting(true); isAreaSelectingRef.current = true; if (fabricRef.current) fabricRef.current.selection = false; }}
+                          <button onClick={() => { setIsAreaSelecting(true); isAreaSelectingRef.current = true; }}
                             style={{ marginLeft: 6, fontSize: 9, color: '#C9A84C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                             再選択
                           </button>

@@ -390,10 +390,11 @@ export default function CoverDesignerPage() {
       };
 
       canvas.on('mouse:down', (opt: any) => {
-        console.log('opt.scenePoint:', opt.scenePoint);
-        console.log('opt.pointer:', opt.pointer);
-        console.log('opt.absolutePointer:', opt.absolutePointer);
-        console.log('canvas.viewportTransform:', canvas.viewportTransform);
+        console.log('=== mouse:down ===');
+        console.log('scenePoint:', opt.scenePoint?.x, opt.scenePoint?.y);
+        console.log('pointer:', opt.pointer?.x, opt.pointer?.y);
+        console.log('absolutePointer:', opt.absolutePointer?.x, opt.absolutePointer?.y);
+        console.log('viewportTransform:', canvas.viewportTransform);
         const p = getPt(opt);
         if (isAreaSelectingRef.current) {
           dragStartRef.current = { x: p.x, y: p.y };
@@ -414,7 +415,12 @@ export default function CoverDesignerPage() {
       });
 
       canvas.on('mouse:move', (opt: any) => {
-        if (!isDraggingRef.current || !dragStartRef.current || !areaRectRef.current) return;
+        if (!isDraggingRef.current) return;
+        console.log('=== mouse:move ===');
+        console.log('scenePoint:', opt.scenePoint?.x, opt.scenePoint?.y);
+        console.log('dragStart:', dragStartRef.current);
+        console.log('rect.left/top (更新前):', areaRectRef.current?.left, areaRectRef.current?.top);
+        if (!dragStartRef.current || !areaRectRef.current) return;
         const p = getPt(opt);
         const left = Math.min(dragStartRef.current.x, p.x);
         const top = Math.min(dragStartRef.current.y, p.y);
@@ -422,6 +428,7 @@ export default function CoverDesignerPage() {
         const height = Math.abs(p.y - dragStartRef.current.y);
         areaRectRef.current.set({ left, top, width, height });
         canvas.renderAll();
+        console.log('rect.left/top (更新後):', areaRectRef.current?.left, areaRectRef.current?.top);
       });
 
       // スタンプ・図形配置 & エリア選択完了

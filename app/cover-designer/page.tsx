@@ -396,6 +396,7 @@ export default function CoverDesignerPage() {
       };
 
       canvas.on('mouse:down', (opt: any) => {
+        console.log('mouse:down handler A 実行');
         if (!isAreaSelectingRef.current) return;
         const p = getPt(opt);
         dragStartRef.current = { x: p.x, y: p.y };

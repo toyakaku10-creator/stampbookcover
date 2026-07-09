@@ -384,9 +384,13 @@ export default function CoverDesignerPage() {
       canvas.on('selection:cleared', () => setHasSelection(false));
 
       // エリア指定ドラッグ（fabric内部座標 + ref参照でクロージャ問題を回避）
+      const getPt = (opt: any) => {
+        const pt = opt.scenePoint ?? opt.pointer;
+        return pt ? { x: pt.x as number, y: pt.y as number } : { x: 0, y: 0 };
+      };
+
       canvas.on('mouse:down', (opt: any) => {
-        console.log('DOWN:', isAreaSelectingRef.current);
-        const p = canvas.getPointer(opt.e);
+        const p = getPt(opt);
         if (isAreaSelectingRef.current) {
           dragStartRef.current = { x: p.x, y: p.y };
           isDraggingRef.current = true;
@@ -407,7 +411,7 @@ export default function CoverDesignerPage() {
 
       canvas.on('mouse:move', (opt: any) => {
         if (!isDraggingRef.current || !dragStartRef.current || !areaRectRef.current) return;
-        const p = canvas.getPointer(opt.e);
+        const p = getPt(opt);
         const left = Math.min(dragStartRef.current.x, p.x);
         const top = Math.min(dragStartRef.current.y, p.y);
         const width = Math.abs(p.x - dragStartRef.current.x);
@@ -418,7 +422,7 @@ export default function CoverDesignerPage() {
 
       // スタンプ・図形配置 & エリア選択完了
       canvas.on('mouse:up', (opt: any) => {
-        const p = canvas.getPointer(opt.e);
+        const p = getPt(opt);
 
         // エリア選択のドラッグ終了
         if (isDraggingRef.current && dragStartRef.current) {

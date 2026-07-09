@@ -384,9 +384,12 @@ export default function CoverDesignerPage() {
       canvas.on('selection:cleared', () => setHasSelection(false));
 
       // エリア指定ドラッグ（fabric内部座標 + ref参照でクロージャ問題を回避）
+      // scenePointはcanvasEl.width基準で返るため、Fabric論理座標(canvas.width)に補正する
       const getPt = (opt: any) => {
         const pt = opt.scenePoint;
-        return pt ? { x: pt.x as number, y: pt.y as number } : { x: 0, y: 0 };
+        if (!pt) return { x: 0, y: 0 };
+        const ratio = (canvas.getElement().width as number) / (canvas.width as number);
+        return { x: (pt.x as number) / ratio, y: (pt.y as number) / ratio };
       };
 
       canvas.on('mouse:down', (opt: any) => {
@@ -399,6 +402,7 @@ export default function CoverDesignerPage() {
         console.log('canvas内部サイズ:', canvasEl.width, canvasEl.height);
         console.log('canvas表示サイズ(CSS):', canvasEl.style.width, canvasEl.style.height);
         console.log('canvas.getZoom():', canvas.getZoom());
+        console.log('canvas.width (Fabric論理):', canvas.width, 'canvasEl.width (内部解像度):', canvasEl.width, 'ratio:', canvasEl.width / (canvas.width as number));
         const p = getPt(opt);
         if (isAreaSelectingRef.current) {
           dragStartRef.current = { x: p.x, y: p.y };

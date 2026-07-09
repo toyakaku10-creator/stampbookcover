@@ -408,6 +408,8 @@ export default function CoverDesignerPage() {
           top: p.y,
           width: 0,
           height: 0,
+          originX: 'left',
+          originY: 'top',
           fill: 'rgba(201,168,76,0.15)',
           stroke: '#C9A84C',
           strokeWidth: 2,
@@ -428,6 +430,7 @@ export default function CoverDesignerPage() {
         const width = Math.abs(p.x - dragStartRef.current.x);
         const height = Math.abs(p.y - dragStartRef.current.y);
         if (areaRectRef.current) {
+          console.log('set直前 left/top/width/height:', left, top, width, height);
           areaRectRef.current.set({ left, top, width, height });
           canvas.renderAll();
         }

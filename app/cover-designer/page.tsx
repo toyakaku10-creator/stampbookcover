@@ -433,6 +433,7 @@ export default function CoverDesignerPage() {
 
       // スタンプ・図形配置 & エリア選択完了
       canvas.on('mouse:up', (opt: any) => {
+        console.log('=== mouse:up ===', 'scenePoint:', opt.scenePoint?.x, opt.scenePoint?.y, 'isDragging:', isDraggingRef.current);
         const p = getPt(opt);
 
         // エリア選択のドラッグ終了

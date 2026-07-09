@@ -577,14 +577,17 @@ export default function CoverDesignerPage() {
         if (naturalSize > 0) group.scale(stampSize / naturalSize);
         canvas.add(group);
       }
-      // 配置後に点線枠を削除（strokeDashArrayを持つ全オブジェクトを対象）
-      const allObjects = canvas.getObjects();
-      const dashedObjects = allObjects.filter((obj: any) =>
-        obj.strokeDashArray && obj.strokeDashArray.length > 0
-      );
-      console.log('placeAtで見えている全オブジェクト数:', allObjects.length, '点線数:', dashedObjects.length);
-      dashedObjects.forEach((obj: any) => canvas.remove(obj));
-      areaRectRef.current = null;
+      // 配置後に点線枠を削除（areaRectRef直接削除 + strokeDashArray全検索の併用）
+      if (canvas && areaRectRef.current) {
+        canvas.remove(areaRectRef.current);
+        areaRectRef.current = null;
+      }
+      if (canvas) {
+        const dashedObjects = canvas.getObjects().filter((obj: any) =>
+          obj.strokeDashArray && obj.strokeDashArray.length > 0
+        );
+        dashedObjects.forEach((obj: any) => canvas.remove(obj));
+      }
       canvas.renderAll();
       saveHistoryRef.current();
       setCustomArea(null);

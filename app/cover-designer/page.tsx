@@ -385,6 +385,7 @@ export default function CoverDesignerPage() {
 
       // エリア指定ドラッグ（fabric内部座標 + ref参照でクロージャ問題を回避）
       canvas.on('mouse:down', (opt: any) => {
+        console.log('DOWN:', isAreaSelectingRef.current);
         const p = canvas.getPointer(opt.e);
         if (isAreaSelectingRef.current) {
           dragStartRef.current = { x: p.x, y: p.y };

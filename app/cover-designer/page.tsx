@@ -205,6 +205,7 @@ export default function CoverDesignerPage() {
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const areaRectRef = useRef<any>(null); // 点線枠（ドラッグ中も配置待ちも同じRef）
+  const isAreaSelectingRef = useRef(false); // Fabricイベントハンドラ内で参照するRef
 
   const setTool = (tool: string) => {
     setActiveTool(tool);
@@ -298,98 +299,15 @@ export default function CoverDesignerPage() {
     canvas.renderAll();
   }, []);
 
-  // ── エリア指定ドラッグ（areaMode === 'custom' の間は常に有効） ────
+  // isAreaSelectingRef を areaMode に同期
   useEffect(() => {
-    if (areaMode !== 'custom' || !fabricRef.current) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const canvas = fabricRef.current as any;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fabric: any = canvas._fabric;
-    if (!fabric) return;
-    // Fabric.js v7: イベントは upperCanvasEl で処理される
-    const eventEl: HTMLCanvasElement = canvas.upperCanvasEl ?? canvas.getElement();
-    if (!eventEl) return;
-
-    const getCanvasPointer = (e: MouseEvent) => {
-      const rect = eventEl.getBoundingClientRect();
-      const scaleX = eventEl.width / rect.width;
-      const scaleY = eventEl.height / rect.height;
-      return {
-        x: (e.clientX - rect.left) * scaleX,
-        y: (e.clientY - rect.top) * scaleY,
-      };
-    };
-
-    const handleDown = (e: MouseEvent) => {
-      const pos = getCanvasPointer(e);
-      dragStartRef.current = pos;
-      // 既存の点線枠を削除して新しいドラッグ開始
-      if (areaRectRef.current) {
-        canvas.remove(areaRectRef.current);
-        areaRectRef.current = null;
-      }
-      const rect = new fabric.Rect({
-        left: pos.x, top: pos.y, width: 0, height: 0,
-        fill: 'transparent',
-        stroke: '#C9A84C',
-        strokeWidth: 1.5,
-        strokeDashArray: [6, 4],
-        selectable: false,
-        evented: false,
-      });
-      areaRectRef.current = rect;
-      canvas.add(rect);
-      canvas.renderAll();
-    };
-
-    const handleMove = (e: MouseEvent) => {
-      if (!dragStartRef.current || !areaRectRef.current) return;
-      const pos = getCanvasPointer(e);
-      const left = Math.min(dragStartRef.current.x, pos.x);
-      const top = Math.min(dragStartRef.current.y, pos.y);
-      const width = Math.abs(pos.x - dragStartRef.current.x);
-      const height = Math.abs(pos.y - dragStartRef.current.y);
-      areaRectRef.current.set({ left, top, width, height });
-      canvas.renderAll();
-    };
-
-    const handleUp = (e: MouseEvent) => {
-      if (!dragStartRef.current) return;
-      const pos = getCanvasPointer(e);
-      const left = Math.min(dragStartRef.current.x, pos.x);
-      const top = Math.min(dragStartRef.current.y, pos.y);
-      const width = Math.abs(pos.x - dragStartRef.current.x);
-      const height = Math.abs(pos.y - dragStartRef.current.y);
-      dragStartRef.current = null;
-
-      if (width > 5 && height > 5) {
-        // 点線枠はそのまま残す（runArrange で消える）
-        setCustomArea({ left, top, width, height });
-      } else {
-        // 小さすぎるドラッグは無効
-        if (areaRectRef.current) {
-          canvas.remove(areaRectRef.current);
-          areaRectRef.current = null;
-        }
-        setCustomArea(null);
-      }
-      canvas.renderAll();
-    };
-
-    eventEl.addEventListener('mousedown', handleDown);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    return () => {
-      eventEl.removeEventListener('mousedown', handleDown);
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-      // areaMode が 'full' に戻ったとき（またはアンマウント時）に枠を削除
-      if (areaRectRef.current && fabricRef.current) {
-        fabricRef.current.remove(areaRectRef.current);
-        areaRectRef.current = null;
-        fabricRef.current.renderAll();
-      }
-    };
+    isAreaSelectingRef.current = areaMode === 'custom';
+    // 'full' に戻ったとき点線枠を削除
+    if (areaMode !== 'custom' && areaRectRef.current && fabricRef.current) {
+      fabricRef.current.remove(areaRectRef.current);
+      areaRectRef.current = null;
+      fabricRef.current.renderAll();
+    }
   }, [areaMode]);
 
   // ── Fabricキャンバス初期化 ────────────────────────────────────────
@@ -450,8 +368,56 @@ export default function CoverDesignerPage() {
       canvas.on('selection:updated', () => updateSelPropsRef.current());
       canvas.on('selection:cleared', () => setHasSelection(false));
 
+      // エリア指定ドラッグ（fabric内部座標を使って正確に一致させる）
+      canvas.on('mouse:down', (opt: any) => {
+        if (!isAreaSelectingRef.current) return;
+        const p = canvas.getPointer(opt.e);
+        dragStartRef.current = { x: p.x, y: p.y };
+        if (areaRectRef.current) canvas.remove(areaRectRef.current);
+        const rect = new fabric.Rect({
+          left: p.x, top: p.y, width: 0, height: 0,
+          fill: 'transparent',
+          stroke: '#C9A84C',
+          strokeWidth: 1.5,
+          strokeDashArray: [6, 4],
+          selectable: false,
+          evented: false,
+        });
+        areaRectRef.current = rect;
+        canvas.add(rect);
+        canvas.renderAll();
+      });
+
+      canvas.on('mouse:move', (opt: any) => {
+        if (!isAreaSelectingRef.current || !dragStartRef.current || !areaRectRef.current) return;
+        const p = canvas.getPointer(opt.e);
+        const left = Math.min(dragStartRef.current.x, p.x);
+        const top = Math.min(dragStartRef.current.y, p.y);
+        const width = Math.abs(p.x - dragStartRef.current.x);
+        const height = Math.abs(p.y - dragStartRef.current.y);
+        areaRectRef.current.set({ left, top, width, height });
+        canvas.renderAll();
+      });
+
       // クリック配置
       canvas.on('mouse:up', (e: any) => {
+        // エリア選択完了
+        if (isAreaSelectingRef.current && dragStartRef.current) {
+          const p = canvas.getPointer(e.e);
+          const left = Math.min(dragStartRef.current.x, p.x);
+          const top = Math.min(dragStartRef.current.y, p.y);
+          const width = Math.abs(p.x - dragStartRef.current.x);
+          const height = Math.abs(p.y - dragStartRef.current.y);
+          dragStartRef.current = null;
+          if (width > 5 && height > 5) {
+            setCustomArea({ left, top, width, height });
+          } else {
+            if (areaRectRef.current) { canvas.remove(areaRectRef.current); areaRectRef.current = null; }
+            setCustomArea(null);
+          }
+          canvas.renderAll();
+          return;
+        }
         console.log('mouse:up fired, activeTool:', activeToolRef.current, 'scenePoint:', e.scenePoint);
         const pt = e.scenePoint ?? e.pointer;
         if (!pt) return;
@@ -718,6 +684,7 @@ export default function CoverDesignerPage() {
     fabricRef.current.remove(...fabricRef.current.getObjects());
     fabricRef.current.renderAll();
     saveHistoryRef.current();
+    localStorage.removeItem('coverdesigner-canvas-state');
   };
 
   const duplicateSelected = async () => {

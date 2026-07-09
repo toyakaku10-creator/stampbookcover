@@ -559,6 +559,8 @@ export default function CoverDesignerPage() {
       : { left: defaultM, top: defaultM, width: canvasW - defaultM * 2, height: canvasH - defaultM * 2 };
 
     const placeAt = async (positions: { x: number; y: number }[]) => {
+      const canvas = fabricRef.current;
+      if (!canvas) return;
       for (let i = 0; i < positions.length; i++) {
         const pos = positions[i];
         const sid = selectedStamps[i % selectedStamps.length];
@@ -576,15 +578,13 @@ export default function CoverDesignerPage() {
         canvas.add(group);
       }
       // 配置後に点線枠を削除（strokeDashArrayを持つ全オブジェクトを対象）
-      if (fabricRef.current) {
-        const allObjects = fabricRef.current.getObjects();
-        const dashedObjects = allObjects.filter((obj: any) =>
-          obj.strokeDashArray && obj.strokeDashArray.length > 0
-        );
-        console.log('placeAtで見えている全オブジェクト数:', allObjects.length, '点線数:', dashedObjects.length);
-        dashedObjects.forEach((obj: any) => fabricRef.current.remove(obj));
-        areaRectRef.current = null;
-      }
+      const allObjects = canvas.getObjects();
+      const dashedObjects = allObjects.filter((obj: any) =>
+        obj.strokeDashArray && obj.strokeDashArray.length > 0
+      );
+      console.log('placeAtで見えている全オブジェクト数:', allObjects.length, '点線数:', dashedObjects.length);
+      dashedObjects.forEach((obj: any) => canvas.remove(obj));
+      areaRectRef.current = null;
       canvas.renderAll();
       saveHistoryRef.current();
       setCustomArea(null);

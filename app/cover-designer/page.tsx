@@ -396,36 +396,10 @@ export default function CoverDesignerPage() {
       };
 
       canvas.on('mouse:down', (opt: any) => {
-        console.log('getScenePoint存在:', typeof canvas.getScenePoint);
-        console.log('getScenePoint結果:', typeof canvas.getScenePoint === 'function' ? canvas.getScenePoint(opt.e) : 'N/A');
-        console.log('opt.scenePoint:', opt.scenePoint);
         if (!isAreaSelectingRef.current) return;
         const p = getPt(opt);
         dragStartRef.current = { x: p.x, y: p.y };
         isDraggingRef.current = true;
-        if (areaRectRef.current) canvas.remove(areaRectRef.current);
-        const rect = new fabric.Rect({
-          left: p.x, top: p.y, width: 0, height: 0,
-          fill: 'transparent',
-          stroke: '#C9A84C',
-          strokeWidth: 1.5,
-          strokeDashArray: [6, 4],
-          selectable: false,
-          evented: false,
-        });
-        areaRectRef.current = rect;
-        canvas.add(rect);
-      });
-
-      canvas.on('mouse:move', (opt: any) => {
-        if (!isDraggingRef.current || !dragStartRef.current || !areaRectRef.current) return;
-        const p = getPt(opt);
-        const left = Math.min(dragStartRef.current.x, p.x);
-        const top = Math.min(dragStartRef.current.y, p.y);
-        const width = Math.abs(p.x - dragStartRef.current.x);
-        const height = Math.abs(p.y - dragStartRef.current.y);
-        areaRectRef.current.set({ left, top, width, height });
-        canvas.renderAll();
       });
 
       // スタンプ・図形配置 & エリア選択完了
@@ -441,11 +415,9 @@ export default function CoverDesignerPage() {
           dragStartRef.current = null;
           if (width > 5 && height > 5) {
             setCustomArea({ left, top, width, height });
-          } else {
-            if (areaRectRef.current) { canvas.remove(areaRectRef.current); areaRectRef.current = null; }
-            setCustomArea(null);
           }
-          canvas.renderAll();
+          setIsAreaSelecting(false);
+          isAreaSelectingRef.current = false;
           return;
         }
 
@@ -1102,20 +1074,10 @@ export default function CoverDesignerPage() {
                 </label>
               </div>
               {areaMode === 'custom' && (
-                <div style={{ fontSize: 10, color: isAreaSelecting ? '#C9A84C' : customArea ? '#888' : '#555' }}>
-                  {isAreaSelecting
-                    ? 'キャンバスでドラッグ'
-                    : customArea
-                      ? (
-                        <span>
-                          {Math.round(customArea.width)}×{Math.round(customArea.height)}px
-                          <button onClick={startAreaSelect}
-                            style={{ marginLeft: 6, fontSize: 9, color: '#C9A84C', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                            再選択
-                          </button>
-                        </span>
-                      )
-                      : 'ドラッグでエリアを選択'}
+                <div style={{ fontSize: 10, color: customArea ? '#C9A84C' : '#888' }}>
+                  {customArea
+                    ? `選択範囲: ${Math.round(customArea.width)}×${Math.round(customArea.height)}px`
+                    : 'ドラッグでエリアを選択してください'}
                 </div>
               )}
             </div>

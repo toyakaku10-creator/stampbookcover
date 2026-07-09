@@ -416,8 +416,6 @@ export default function CoverDesignerPage() {
           if (width > 5 && height > 5) {
             setCustomArea({ left, top, width, height });
           }
-          setIsAreaSelecting(false);
-          isAreaSelectingRef.current = false;
           return;
         }
 

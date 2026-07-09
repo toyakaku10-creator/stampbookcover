@@ -395,6 +395,10 @@ export default function CoverDesignerPage() {
         console.log('pointer:', opt.pointer?.x, opt.pointer?.y);
         console.log('absolutePointer:', opt.absolutePointer?.x, opt.absolutePointer?.y);
         console.log('viewportTransform:', canvas.viewportTransform);
+        const canvasEl = canvas.getElement();
+        console.log('canvas内部サイズ:', canvasEl.width, canvasEl.height);
+        console.log('canvas表示サイズ(CSS):', canvasEl.style.width, canvasEl.style.height);
+        console.log('canvas.getZoom():', canvas.getZoom());
         const p = getPt(opt);
         if (isAreaSelectingRef.current) {
           dragStartRef.current = { x: p.x, y: p.y };

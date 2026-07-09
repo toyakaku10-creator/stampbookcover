@@ -574,13 +574,14 @@ export default function CoverDesignerPage() {
       }
       canvas.renderAll();
       saveHistoryRef.current();
-      // 配置後に点線枠を削除
-      if (areaRectRef.current && fabricRef.current) {
-        fabricRef.current.remove(areaRectRef.current);
+      // 配置後に点線枠を削除（strokeDashArrayを持つ全オブジェクトを対象）
+      if (fabricRef.current) {
+        const dashedObjects = fabricRef.current.getObjects().filter((obj: any) =>
+          obj.strokeDashArray && obj.strokeDashArray.length > 0
+        );
+        dashedObjects.forEach((obj: any) => fabricRef.current.remove(obj));
         areaRectRef.current = null;
         fabricRef.current.renderAll();
-      } else {
-        alert('点線削除がスキップされました');
       }
       setCustomArea(null);
     };

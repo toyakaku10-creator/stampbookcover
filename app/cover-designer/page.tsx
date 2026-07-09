@@ -385,7 +385,7 @@ export default function CoverDesignerPage() {
 
       // エリア指定ドラッグ（fabric内部座標 + ref参照でクロージャ問題を回避）
       const getPt = (opt: any) => {
-        const pt = opt.scenePoint ?? opt.pointer;
+        const pt = opt.scenePoint;
         return pt ? { x: pt.x as number, y: pt.y as number } : { x: 0, y: 0 };
       };
 
@@ -438,9 +438,6 @@ export default function CoverDesignerPage() {
             if (areaRectRef.current) { canvas.remove(areaRectRef.current); areaRectRef.current = null; }
             setCustomArea(null);
           }
-          isAreaSelectingRef.current = false;
-          setIsAreaSelecting(false);
-          canvas.selection = true;
           canvas.renderAll();
           return;
         }

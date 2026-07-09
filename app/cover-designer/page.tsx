@@ -390,6 +390,10 @@ export default function CoverDesignerPage() {
       };
 
       canvas.on('mouse:down', (opt: any) => {
+        console.log('opt.scenePoint:', opt.scenePoint);
+        console.log('opt.pointer:', opt.pointer);
+        console.log('opt.absolutePointer:', opt.absolutePointer);
+        console.log('canvas.viewportTransform:', canvas.viewportTransform);
         const p = getPt(opt);
         if (isAreaSelectingRef.current) {
           dragStartRef.current = { x: p.x, y: p.y };

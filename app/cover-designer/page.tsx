@@ -1031,6 +1031,15 @@ export default function CoverDesignerPage() {
           style={S.iconBtn(snapOn)}>
           <Magnet size={15} />
         </button>
+        <div style={{ width: 1, height: 16, background: '#2A4570' }} />
+        <button
+          onClick={() => { if (!window.confirm('すべて削除しますか？')) return; clearAll(); }}
+          title="全クリア"
+          style={{ ...S.iconBtn(), color: '#6B7A99' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#E05A5A'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = '#6B7A99'; }}>
+          <Trash2 size={15} />
+        </button>
         <span style={{ color: 'var(--border)' }}>|</span>
         <button onClick={exportJPEG} style={S.btn()}>
           <Download size={13} /> JPEG
@@ -1298,18 +1307,6 @@ export default function CoverDesignerPage() {
             )}
           </div>
 
-          {/* 全クリア */}
-          <div style={{ marginTop: 16, padding: '12px 12px 16px', borderTop: '1px solid #2A4570' }}>
-            <button
-              onClick={() => { if (!window.confirm('すべて削除しますか？')) return; clearAll(); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', color: '#6B7A99', fontSize: 11, borderRadius: 4, background: 'transparent', border: 'none', cursor: 'pointer' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#E05A5A'; e.currentTarget.style.background = '#2A4570'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = '#6B7A99'; e.currentTarget.style.background = 'transparent'; }}
-            >
-              <Trash2 size={12} />
-              全クリア
-            </button>
-          </div>
         </div>
 
         {/* Canvas */}

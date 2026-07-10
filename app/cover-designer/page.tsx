@@ -259,17 +259,16 @@ export default function CoverDesignerPage() {
     saveHistoryRef.current();
   }, []);
 
-  const undo = useCallback(() => {
+  const undo = useCallback(async () => {
     if (historyIndexRef.current <= 0 || !fabricRef.current) return;
     const canvas = fabricRef.current;
     historyIndexRef.current--;
     isBatchingRef.current = true;
-    canvas.loadFromJSON(JSON.parse(historyRef.current[historyIndexRef.current]), () => {
-      canvas.backgroundColor = bgColorRef.current;
-      canvas.renderAll();
-      isBatchingRef.current = false;
-      setCanUndo(historyIndexRef.current > 0);
-    });
+    await canvas.loadFromJSON(JSON.parse(historyRef.current[historyIndexRef.current]));
+    canvas.backgroundColor = bgColorRef.current;
+    canvas.renderAll();
+    isBatchingRef.current = false;
+    setCanUndo(historyIndexRef.current > 0);
   }, []);
 
   useEffect(() => {

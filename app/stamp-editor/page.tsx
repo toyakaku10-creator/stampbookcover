@@ -864,11 +864,32 @@ export default function StampEditorPage() {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         {/* ── アイコンツールバー ─────────────────────────────── */}
         <div style={S.toolbar}>
-          {TOOLS.map(t => (
-            <button key={t.id} title={t.title} onClick={() => setTool(t.id)} style={S.toolBtn(tool === t.id)}>
-              {t.icon}
-            </button>
-          ))}
+          {TOOLS.map(t => {
+            if (t.id === 'polygon') {
+              const isActive = tool === 'polygon';
+              return (
+                <div key={t.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <button title={t.title} onClick={() => setTool('polygon')} style={S.toolBtn(isActive)}>
+                    {t.icon}
+                  </button>
+                  {isActive && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <button onClick={() => setPolygonSides(s => Math.max(3, s - 1))}
+                        style={{ width: 16, height: 16, border: '1px solid var(--border)', borderRadius: 3, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 10, padding: 0, lineHeight: 1 }}>−</button>
+                      <span style={{ width: 18, textAlign: 'center', fontSize: 10, fontWeight: 700 }}>{polygonSides}</span>
+                      <button onClick={() => setPolygonSides(s => Math.min(12, s + 1))}
+                        style={{ width: 16, height: 16, border: '1px solid var(--border)', borderRadius: 3, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 10, padding: 0, lineHeight: 1 }}>＋</button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <button key={t.id} title={t.title} onClick={() => setTool(t.id)} style={S.toolBtn(tool === t.id)}>
+                {t.icon}
+              </button>
+            );
+          })}
           <div style={S.divider} />
           <button title={`スナップ ${snapEnabled ? 'ON' : 'OFF'}`}
             onClick={() => setSnapEnabled(v => !v)}
@@ -917,18 +938,6 @@ export default function StampEditorPage() {
             </div>
             <input type="range" min="0.5" max="20" step="0.5" value={strokeWidth}
               onChange={e => setStrokeWidth(Number(e.target.value))} style={{ width: '100%' }} />
-          </div>
-
-          {/* 多角形：角数 — 常設 */}
-          <div>
-            <div style={S.label}>多角形の角数</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button onClick={() => setPolygonSides(s => Math.max(3, s - 1))}
-                style={{ width: 24, height: 24, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-              <span style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>{polygonSides}</span>
-              <button onClick={() => setPolygonSides(s => Math.min(12, s + 1))}
-                style={{ width: 24, height: 24, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>＋</button>
-            </div>
           </div>
 
           {/* テキスト専用オプション */}

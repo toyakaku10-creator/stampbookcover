@@ -1195,16 +1195,34 @@ export default function CoverDesignerPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
                   {SHAPE_TOOLS.map(t => {
                     const isActive = activeTool === t.id;
+                    const btnStyle = {
+                      display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
+                      gap: 2, padding: '5px 2px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                      background: isActive ? 'var(--accent)' : 'var(--bg)',
+                      color: isActive ? '#1A1A1A' : 'var(--text)',
+                      fontSize: 8, fontWeight: 600, width: '100%',
+                    };
+                    if (t.id === 'polygon') {
+                      return (
+                        <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <button onClick={() => setTool(isActive ? 'select' : 'polygon')} title={t.title} style={btnStyle}>
+                            {t.icon}多角
+                          </button>
+                          {isActive && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                              <button onClick={() => setPolygonSides(s => Math.max(3, s - 1))}
+                                style={{ width: 16, height: 16, border: '1px solid var(--border)', borderRadius: 3, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 10, padding: 0, lineHeight: 1 }}>−</button>
+                              <span style={{ width: 18, textAlign: 'center', fontSize: 10, fontWeight: 700 }}>{polygonSides}</span>
+                              <button onClick={() => setPolygonSides(s => Math.min(12, s + 1))}
+                                style={{ width: 16, height: 16, border: '1px solid var(--border)', borderRadius: 3, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 10, padding: 0, lineHeight: 1 }}>＋</button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
                     return (
                       <button key={t.id} onClick={() => setTool(isActive && t.id !== 'select' ? 'select' : t.id)}
-                        title={t.title}
-                        style={{
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                          gap: 2, padding: '5px 2px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                          background: isActive ? 'var(--accent)' : 'var(--bg)',
-                          color: isActive ? '#1A1A1A' : 'var(--text)',
-                          fontSize: 8, fontWeight: 600,
-                        }}>
+                        title={t.title} style={btnStyle}>
                         {t.icon}
                         {t.title.length <= 3 ? t.title : t.title.slice(0, 3)}
                       </button>
@@ -1220,15 +1238,6 @@ export default function CoverDesignerPage() {
                     </button>
                   </div>
                 )}
-                {/* 多角形の角数 — 常設 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
-                  <span style={{ fontSize: 10, color: '#888', flex: 1 }}>多角形の角数</span>
-                  <button onClick={() => setPolygonSides(s => Math.max(3, s - 1))}
-                    style={{ width: 20, height: 20, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-                  <span style={{ width: 20, textAlign: 'center', fontSize: 12, fontWeight: 600 }}>{polygonSides}</span>
-                  <button onClick={() => setPolygonSides(s => Math.min(12, s + 1))}
-                    style={{ width: 20, height: 20, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>＋</button>
-                </div>
               </div>
             )}
           </div>

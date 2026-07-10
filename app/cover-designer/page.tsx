@@ -921,19 +921,22 @@ export default function CoverDesignerPage() {
       // 画像描画：シアー変換 → 内側クリップ（spineLeft-4まで拡張）→ 画像
       ctx.transform(1, 15 / previewSpineW, 0, 1, spineLeft, 55);
       const SHEAR_COMPENSATE = 80;
-      const extraH = 8;   // 下端を延長して塗り残しを防ぐ
+      const extraH = 8;        // 下端の基本延長
+      const extraBottom = 6;   // 下端追加延長（1回目）
       const leftExt = 4;  // 外側クリップの最大張り出し点（spineLeft-4）まで確実にカバー
       ctx.beginPath();
-      ctx.rect(-leftExt, 80 - SHEAR_COMPENSATE, previewSpineW + leftExt, 260 + extraH);
+      const dh = 260 + extraH + extraBottom;
+      const sh = bookHeightPxY * dh / 260;
+      ctx.rect(-leftExt, 80 - SHEAR_COMPENSATE, previewSpineW + leftExt, dh);
       ctx.clip();
       ctx.scale(-1, 1);
       ctx.drawImage(
         img,
         sx, bookStartPxY,
         sw * (previewSpineW + leftExt) / previewSpineW,
-        bookHeightPxY * (260 + extraH) / 260,
+        sh,
         -previewSpineW, 80 - SHEAR_COMPENSATE,
-        previewSpineW + leftExt, 260 + extraH
+        previewSpineW + leftExt, dh
       );
       ctx.restore();
 

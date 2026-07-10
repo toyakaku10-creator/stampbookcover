@@ -27,14 +27,7 @@ const TOOL_DEFS: { id: Tool; icon: React.ReactNode; title: string }[] = [
     ),
   },
   { id: 'triangle',       icon: <Triangle size={14} />,      title: '三角' },
-  {
-    id: 'hexagon', title: '六角形',
-    icon: (
-      <svg viewBox="0 0 16 16" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={1.5}>
-        <polygon points="8,1 14.2,4.5 14.2,11.5 8,15 1.8,11.5 1.8,4.5" />
-      </svg>
-    ),
-  },
+
   {
     id: 'polygon', title: '多角形',
     icon: (

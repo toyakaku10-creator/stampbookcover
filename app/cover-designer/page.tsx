@@ -916,12 +916,20 @@ export default function CoverDesignerPage() {
       ctx.clip();
       ctx.transform(1, 15 / previewSpineW, 0, 1, spineLeft, 55);
       const SHEAR_COMPENSATE = 80;
-      const extraH = 4;
+      const extraH = 8;   // 下端を延長して塗り残しを防ぐ
+      const leftExt = 4;  // 左端のベジェ曲線張り出し（≈0.55px）を確実にカバー
       ctx.beginPath();
-      ctx.rect(0, 80 - SHEAR_COMPENSATE, previewSpineW, 260 + extraH);
+      ctx.rect(-leftExt, 80 - SHEAR_COMPENSATE, previewSpineW + leftExt, 260 + extraH);
       ctx.clip();
       ctx.scale(-1, 1);
-      ctx.drawImage(img, sx, bookStartPxY, sw, bookHeightPxY * (260 + extraH) / 260, -previewSpineW, 80 - SHEAR_COMPENSATE, previewSpineW, 260 + extraH);
+      ctx.drawImage(
+        img,
+        sx, bookStartPxY,
+        sw * (previewSpineW + leftExt) / previewSpineW,
+        bookHeightPxY * (260 + extraH) / 260,
+        -previewSpineW, 80 - SHEAR_COMPENSATE,
+        previewSpineW + leftExt, 260 + extraH
+      );
       ctx.restore();
 
       // 背表紙：縁取り

@@ -39,11 +39,13 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
     const HEIGHT = Math.round(SIDE * (Math.sqrt(3) / 2));
     return new fabric.Triangle({ ...opts, ...pos, width: SIDE, height: HEIGHT });
   }
-  if (toolId === 'right-triangle') {
-    return new fabric.Polygon(
-      [{ x: 0, y: 0 }, { x: 80, y: 0 }, { x: 0, y: 80 }],
-      { ...opts, left: cx - 40, top: cy - 40 },
-    );
+  if (toolId === 'hexagon') {
+    const r = 40;
+    const points = Array.from({ length: 6 }, (_, i) => {
+      const a = (Math.PI / 3) * i - Math.PI / 2;
+      return { x: r + r * Math.cos(a), y: r + r * Math.sin(a) };
+    });
+    return new fabric.Polygon(points, { ...opts, left: cx - r, top: cy - r });
   }
   if (toolId === 'polygon') {
     const sides = canvas.polygonSides ?? 5;

@@ -42,10 +42,10 @@ const TOOLS: { id: Tool; icon: React.ReactNode; title: string }[] = [
   },
   { id: 'triangle', icon: <Triangle size={18} />, title: '三角' },
   {
-    id: 'right-triangle', title: '直角三角形',
+    id: 'hexagon', title: '六角形',
     icon: (
       <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.5}>
-        <polygon points="2,18 18,18 2,2" />
+        <polygon points="10,1 17.7,5.5 17.7,14.5 10,19 2.3,14.5 2.3,5.5" />
       </svg>
     ),
   },

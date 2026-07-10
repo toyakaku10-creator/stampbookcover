@@ -8,7 +8,7 @@ export interface Stamp {
 
 export type Tool =
   | 'select' | 'line' | 'rect' | 'circle' | 'triangle'
-  | 'right-triangle' | 'polygon'
+  | 'hexagon' | 'polygon'
   | 'h-diamond'
   | 'trapezoid' | 'arc' | 'dot'
   | 'text';

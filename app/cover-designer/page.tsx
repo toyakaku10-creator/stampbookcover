@@ -156,6 +156,7 @@ export default function CoverDesignerPage() {
   const [stampSize, setStampSize] = useState(60);
   const stampSizeRef = useRef(60);
   const [selectedStamps, setSelectedStamps] = useState<string[]>([]);
+  const [stampTab, setStampTab] = useState<'single' | 'arrange'>('single');
   const [expandedSection, setExpandedSection] = useState<string>('');
   const [showPreview, setShowPreview] = useState(false);
   const [previewDataUrl, setPreviewDataUrl] = useState('');
@@ -1057,142 +1058,171 @@ export default function CoverDesignerPage() {
               style={{ width: '100%', height: 32, borderRadius: 6 }} />
           </div>
 
-          {/* 2. スタンプ — 常時表示 */}
+          {/* 2. スタンプ（タブ切り替え） */}
           <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <span style={{ color: '#C9A84C', fontSize: 12, fontWeight: 500 }}>スタンプを配置</span>
-              {activeTool.startsWith('stamp-') && (
-                <button onClick={() => setTool('select')}
-                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>
-                  <X size={11} />
-                </button>
-              )}
+            {/* タブ */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 8, borderBottom: '1px solid #2A4570' }}>
+              <button
+                onClick={() => setStampTab('single')}
+                style={{
+                  flex: 1, padding: '6px 0',
+                  color: stampTab === 'single' ? '#C9A84C' : '#6B7A99',
+                  borderBottom: stampTab === 'single' ? '2px solid #C9A84C' : '2px solid transparent',
+                  background: 'transparent', border: 'none',
+                  fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                }}
+              >
+                単独配置
+              </button>
+              <button
+                onClick={() => setStampTab('arrange')}
+                style={{
+                  flex: 1, padding: '6px 0',
+                  color: stampTab === 'arrange' ? '#C9A84C' : '#6B7A99',
+                  borderBottom: stampTab === 'arrange' ? '2px solid #C9A84C' : '2px solid transparent',
+                  background: 'transparent', border: 'none',
+                  fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                }}
+              >
+                均等配置
+              </button>
             </div>
-            <div style={{ marginBottom: 8 }}>
-              <NumberStepper label="サイズ" value={stampSize} onChange={setStampSize} min={10} max={300} step={5} />
-            </div>
-            {stamps.length === 0
-              ? <div style={{ fontSize: 11, color: '#555', marginBottom: 8 }}>スタンプなし</div>
-              : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                  {stamps.map(stamp => {
-                    const isActive = activeTool === `stamp-${stamp.id}`;
+
+            {/* 単独配置タブ */}
+            {stampTab === 'single' && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  {activeTool.startsWith('stamp-') && (
+                    <button onClick={() => setTool('select')}
+                      style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>
+                      <X size={11} />
+                    </button>
+                  )}
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <NumberStepper label="サイズ" value={stampSize} onChange={setStampSize} min={10} max={300} step={5} />
+                </div>
+                {stamps.length === 0
+                  ? <div style={{ fontSize: 11, color: '#555', marginBottom: 8 }}>スタンプなし</div>
+                  : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                      {stamps.map(stamp => {
+                        const isActive = activeTool === `stamp-${stamp.id}`;
+                        return (
+                          <div key={stamp.id} onClick={() => setTool(isActive ? 'select' : `stamp-${stamp.id}`)}
+                            style={{
+                              width: 53, height: 53, background: '#ffffff', borderRadius: 6,
+                              border: isActive ? '2px solid #C9A84C' : '2px solid transparent',
+                              cursor: 'pointer', display: 'flex', alignItems: 'center',
+                              justifyContent: 'center', overflow: 'hidden',
+                            }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={stamp.thumbnail} alt={stamp.name}
+                              style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 2 }} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                }
+              </div>
+            )}
+
+            {/* 均等配置タブ */}
+            {stampTab === 'arrange' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                  {ARRANGEMENTS.map(a => (
+                    <button key={a.id} onClick={() => setArrangement(a.id)}
+                      style={{ ...S.btn(arrangement === a.id), flexDirection: 'column', gap: 2, padding: '6px 4px', fontSize: 10 }}>
+                      {a.icon}
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 列数・行数（グリッド・千鳥のみ） */}
+                {(arrangement === 'grid' || arrangement === 'stagger') && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <NumberStepper label="列数" value={cols} onChange={setCols} min={1} max={20} />
+                    <NumberStepper label="行数" value={rows} onChange={setRows} min={1} max={20} />
+                  </div>
+                )}
+
+                {(arrangement === 'grid' || arrangement === 'stagger') ? (
+                  <div style={{ ...S.label, display: 'flex', justifyContent: 'space-between', marginBottom: 0 }}>
+                    <span>合計</span>
+                    <span style={{ color: 'var(--accent)' }}>{Math.max(1, cols) * Math.max(1, rows)}個</span>
+                  </div>
+                ) : (
+                  <NumberStepper label="個数" value={arrangementCount} onChange={setArrangementCount} min={1} max={100} />
+                )}
+
+                {/* エリア指定 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ fontSize: 10, color: '#888' }}>配置エリア</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer' }}>
+                      <input type="radio" checked={areaMode === 'full'} onChange={() => { setAreaMode('full'); setIsAreaSelecting(false); isAreaSelectingRef.current = false; if (fabricRef.current) { fabricRef.current.selection = true; fabricRef.current.renderAll(); } }} />
+                      全体
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer' }}>
+                      <input type="radio" checked={areaMode === 'custom'} onChange={startAreaSelect} />
+                      エリア指定
+                    </label>
+                  </div>
+                  {areaMode === 'custom' && (
+                    <div style={{ fontSize: 10, color: customArea ? '#C9A84C' : '#888' }}>
+                      {customArea
+                        ? `選択範囲: ${Math.round(customArea.width)}×${Math.round(customArea.height)}px`
+                        : 'ドラッグでエリアを選択してください'}
+                    </div>
+                  )}
+                </div>
+                {selectedStamps.length > 0 && (
+                  <button onClick={() => setSelectedStamps([])}
+                    style={{ fontSize: 10, color: '#888', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 4, padding: 0 }}>
+                    選択解除
+                  </button>
+                )}
+                {stamps.length === 0 && <div style={{ fontSize: 11, color: '#555' }}>スタンプなし</div>}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
+                  {stamps.map(s => {
+                    const idx = selectedStamps.indexOf(s.id);
+                    const isSel = idx !== -1;
                     return (
-                      <div key={stamp.id} onClick={() => setTool(isActive ? 'select' : `stamp-${stamp.id}`)}
-                        style={{
-                          width: 53, height: 53, background: '#ffffff', borderRadius: 6,
-                          border: isActive ? '2px solid #C9A84C' : '2px solid transparent',
+                      <div key={s.id}
+                        onClick={() => setSelectedStamps(prev =>
+                          prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id]
+                        )}
+                        style={{ position: 'relative', width: 53, height: 53, background: '#ffffff', borderRadius: 6,
+                          border: isSel ? '2px solid #C9A84C' : '2px solid transparent',
                           cursor: 'pointer', display: 'flex', alignItems: 'center',
-                          justifyContent: 'center', overflow: 'hidden',
-                        }}>
+                          justifyContent: 'center', overflow: 'hidden' }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={stamp.thumbnail} alt={stamp.name}
+                        <img src={s.thumbnail} alt={s.name}
                           style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 2 }} />
+                        {isSel && (
+                          <div style={{
+                            position: 'absolute', top: 2, right: 2,
+                            background: '#C9A84C', color: '#0F2340',
+                            borderRadius: '50%', width: 16, height: 16,
+                            fontSize: 9, fontWeight: 700,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>
+                            {idx + 1}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-              )
-            }
-          </div>
-
-          {/* 2. 均等配置 — 常時表示 */}
-          <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ borderTop: '2px solid #C9A84C', margin: '12px 0 0', paddingTop: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <span style={{ color: '#C9A84C', fontSize: 12, fontWeight: 500 }}>均等に配置</span>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
-              {ARRANGEMENTS.map(a => (
-                <button key={a.id} onClick={() => setArrangement(a.id)}
-                  style={{ ...S.btn(arrangement === a.id), flexDirection: 'column', gap: 2, padding: '6px 4px', fontSize: 10 }}>
-                  {a.icon}
-                  {a.label}
+                <button onClick={runArrange} disabled={selectedStamps.length === 0}
+                  style={{ ...S.btn(true), width: '100%', opacity: selectedStamps.length > 0 ? 1 : 0.4, cursor: selectedStamps.length > 0 ? 'pointer' : 'not-allowed' }}>
+                  <Grid size={13} /> 配置を実行
                 </button>
-              ))}
-            </div>
-
-            {/* 列数・行数（グリッド・千鳥のみ） */}
-            {(arrangement === 'grid' || arrangement === 'stagger') && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <NumberStepper label="列数" value={cols} onChange={setCols} min={1} max={20} />
-                <NumberStepper label="行数" value={rows} onChange={setRows} min={1} max={20} />
               </div>
             )}
-
-            {(arrangement === 'grid' || arrangement === 'stagger') ? (
-              <div style={{ ...S.label, display: 'flex', justifyContent: 'space-between', marginBottom: 0 }}>
-                <span>合計</span>
-                <span style={{ color: 'var(--accent)' }}>{Math.max(1, cols) * Math.max(1, rows)}個</span>
-              </div>
-            ) : (
-              <NumberStepper label="個数" value={arrangementCount} onChange={setArrangementCount} min={1} max={100} />
-            )}
-
-            {/* エリア指定 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ fontSize: 10, color: '#888' }}>配置エリア</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer' }}>
-                  <input type="radio" checked={areaMode === 'full'} onChange={() => { setAreaMode('full'); setIsAreaSelecting(false); isAreaSelectingRef.current = false; if (fabricRef.current) { fabricRef.current.selection = true; fabricRef.current.renderAll(); } }} />
-                  全体
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, cursor: 'pointer' }}>
-                  <input type="radio" checked={areaMode === 'custom'} onChange={startAreaSelect} />
-                  エリア指定
-                </label>
-              </div>
-              {areaMode === 'custom' && (
-                <div style={{ fontSize: 10, color: customArea ? '#C9A84C' : '#888' }}>
-                  {customArea
-                    ? `選択範囲: ${Math.round(customArea.width)}×${Math.round(customArea.height)}px`
-                    : 'ドラッグでエリアを選択してください'}
-                </div>
-              )}
-            </div>
-            {selectedStamps.length > 0 && (
-              <button onClick={() => setSelectedStamps([])}
-                style={{ fontSize: 10, color: '#888', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 4, padding: 0 }}>
-                選択解除
-              </button>
-            )}
-            {stamps.length === 0 && <div style={{ fontSize: 11, color: '#555' }}>スタンプなし</div>}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
-              {stamps.map(s => {
-                const idx = selectedStamps.indexOf(s.id);
-                const isSel = idx !== -1;
-                return (
-                  <div key={s.id}
-                    onClick={() => setSelectedStamps(prev =>
-                      prev.includes(s.id) ? prev.filter(id => id !== s.id) : [...prev, s.id]
-                    )}
-                    style={{ position: 'relative', width: 53, height: 53, background: '#ffffff', borderRadius: 6,
-                      border: isSel ? '2px solid #C9A84C' : '2px solid transparent',
-                      cursor: 'pointer', display: 'flex', alignItems: 'center',
-                      justifyContent: 'center', overflow: 'hidden' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={s.thumbnail} alt={s.name}
-                      style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 2 }} />
-                    {isSel && (
-                      <div style={{
-                        position: 'absolute', top: 2, right: 2,
-                        background: '#C9A84C', color: '#0F2340',
-                        borderRadius: '50%', width: 16, height: 16,
-                        fontSize: 9, fontWeight: 700,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {idx + 1}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <button onClick={runArrange} disabled={selectedStamps.length === 0}
-              style={{ ...S.btn(true), width: '100%', opacity: selectedStamps.length > 0 ? 1 : 0.4, cursor: selectedStamps.length > 0 ? 'pointer' : 'not-allowed' }}>
-              <Grid size={13} /> 配置を実行
-            </button>
           </div>
 
           {/* 3. 図形 — 折りたたみ */}

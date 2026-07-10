@@ -1131,6 +1131,7 @@ export default function CoverDesignerPage() {
             {/* 均等配置タブ */}
             {stampTab === 'arrange' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <NumberStepper label="サイズ" value={stampSize} onChange={setStampSize} min={10} max={300} step={5} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
                   {ARRANGEMENTS.map(a => (
                     <button key={a.id} onClick={() => setArrangement(a.id)}

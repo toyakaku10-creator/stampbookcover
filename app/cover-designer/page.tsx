@@ -1050,7 +1050,14 @@ export default function CoverDesignerPage() {
         {/* Left panel */}
         <div style={{ width: 200, background: 'var(--surface)', borderRight: '1px solid var(--border)', overflowY: 'auto', flexShrink: 0 }}>
 
-          {/* 1. スタンプ — 常時表示 */}
+          {/* 1. 背景色 — 常時表示 */}
+          <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ ...S.label, marginBottom: 4 }}>背景色</div>
+            <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)}
+              style={{ width: '100%', height: 32, borderRadius: 6 }} />
+          </div>
+
+          {/* 2. スタンプ — 常時表示 */}
           <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
               <span style={{ color: '#C9A84C', fontSize: 12, fontWeight: 500 }}>スタンプを配置</span>
@@ -1188,14 +1195,7 @@ export default function CoverDesignerPage() {
             </button>
           </div>
 
-          {/* 3. 背景色 — 常時表示（スタンプ+均等配置ブロックとの区切り） */}
-          <div style={{ borderTop: '2px solid #C9A84C', margin: '12px 0 0', padding: '12px 12px 12px' }}>
-            <div style={{ ...S.label, marginBottom: 4 }}>背景色</div>
-            <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)}
-              style={{ width: '100%', height: 32, borderRadius: 6 }} />
-          </div>
-
-          {/* 4. 図形 — 折りたたみ */}
+          {/* 3. 図形 — 折りたたみ */}
           <div>
             <button onClick={toggleShapeSection}
               style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', ...S.sectionTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

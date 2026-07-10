@@ -186,6 +186,7 @@ export default function CoverDesignerPage() {
 
   // 右サイドバー プロパティ
   const [hasSelection, setHasSelection] = useState(false);
+  const [isStamp, setIsStamp] = useState(false);
   const [selFill, setSelFill] = useState('#000000');
   const [selStroke, setSelStroke] = useState('#000000');
   const [selStrokeW, setSelStrokeW] = useState(1);
@@ -288,8 +289,9 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const obj: any = canvas?.getActiveObject();
-    if (!obj) { setHasSelection(false); return; }
+    if (!obj) { setHasSelection(false); setIsStamp(false); return; }
     setHasSelection(true);
+    setIsStamp(obj.type === 'group');
     setSelFill(typeof obj.fill === 'string' && obj.fill ? obj.fill : '#000000');
     setSelStroke(typeof obj.stroke === 'string' && obj.stroke ? obj.stroke : '#000000');
     setSelStrokeW(obj.strokeWidth ?? 1);
@@ -1332,31 +1334,33 @@ export default function CoverDesignerPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
 
-              {/* 塗り色 */}
-              <div style={{ ...S.sectionTitle, borderTop: 'none' }}>塗り色</div>
-              <div style={{ padding: '0 12px 8px' }}>
-                <input type="color" value={selFill}
-                  onChange={e => { setSelFill(e.target.value); applySelProp({ fill: e.target.value }); }}
-                  style={{ width: '100%', height: 28, borderRadius: 6, cursor: 'pointer' }} />
-              </div>
+              {/* 塗り色・線色・線幅（スタンプ以外のみ） */}
+              {!isStamp && (
+                <>
+                  <div style={{ ...S.sectionTitle, borderTop: 'none' }}>塗り色</div>
+                  <div style={{ padding: '0 12px 8px' }}>
+                    <input type="color" value={selFill}
+                      onChange={e => { setSelFill(e.target.value); applySelProp({ fill: e.target.value }); }}
+                      style={{ width: '100%', height: 28, borderRadius: 6, cursor: 'pointer' }} />
+                  </div>
 
-              {/* 線色 */}
-              <div style={S.sectionTitle}>線色</div>
-              <div style={{ padding: '0 12px 8px' }}>
-                <input type="color" value={selStroke}
-                  onChange={e => { setSelStroke(e.target.value); applySelProp({ stroke: e.target.value }); }}
-                  style={{ width: '100%', height: 28, borderRadius: 6, cursor: 'pointer' }} />
-              </div>
+                  <div style={S.sectionTitle}>線色</div>
+                  <div style={{ padding: '0 12px 8px' }}>
+                    <input type="color" value={selStroke}
+                      onChange={e => { setSelStroke(e.target.value); applySelProp({ stroke: e.target.value }); }}
+                      style={{ width: '100%', height: 28, borderRadius: 6, cursor: 'pointer' }} />
+                  </div>
 
-              {/* 線幅 */}
-              <div style={S.sectionTitle}>線幅</div>
-              <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <button onClick={() => { const v = Math.max(0, selStrokeW - 1); setSelStrokeW(v); applySelProp({ strokeWidth: v }); }}
-                  style={S.iconBtn()}><Minus size={12} /></button>
-                <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{selStrokeW}</span>
-                <button onClick={() => { const v = selStrokeW + 1; setSelStrokeW(v); applySelProp({ strokeWidth: v }); }}
-                  style={S.iconBtn()}><Plus size={12} /></button>
-              </div>
+                  <div style={S.sectionTitle}>線幅</div>
+                  <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button onClick={() => { const v = Math.max(0, selStrokeW - 1); setSelStrokeW(v); applySelProp({ strokeWidth: v }); }}
+                      style={S.iconBtn()}><Minus size={12} /></button>
+                    <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{selStrokeW}</span>
+                    <button onClick={() => { const v = selStrokeW + 1; setSelStrokeW(v); applySelProp({ strokeWidth: v }); }}
+                      style={S.iconBtn()}><Plus size={12} /></button>
+                  </div>
+                </>
+              )}
 
               {/* 透明度 */}
               <div style={S.sectionTitle}>透明度</div>

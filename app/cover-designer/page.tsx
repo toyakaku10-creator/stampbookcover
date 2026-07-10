@@ -182,6 +182,7 @@ export default function CoverDesignerPage() {
   const historyIndexRef = useRef(-1);
   const [canUndo, setCanUndo] = useState(false);
   const restoringRef = useRef(false);
+  const isBatchingRef = useRef(false);
 
   // スナップ
   const [snapOn, setSnapOn] = useState(false);
@@ -237,6 +238,7 @@ export default function CoverDesignerPage() {
   // ── アンドゥ ──────────────────────────────────────────────────────
   const saveHistory = useCallback(() => {
     if (restoringRef.current) return;
+    if (isBatchingRef.current) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     try {
@@ -561,6 +563,7 @@ export default function CoverDesignerPage() {
     const placeAt = async (positions: { x: number; y: number }[]) => {
       const canvas = fabricRef.current;
       if (!canvas) return;
+      isBatchingRef.current = true;
       for (let i = 0; i < positions.length; i++) {
         const pos = positions[i];
         const sid = selectedStamps[i % selectedStamps.length];
@@ -589,6 +592,7 @@ export default function CoverDesignerPage() {
         dashedObjects.forEach((obj: any) => canvas.remove(obj));
       }
       canvas.renderAll();
+      isBatchingRef.current = false;
       saveHistoryRef.current();
       setCustomArea(null);
     };

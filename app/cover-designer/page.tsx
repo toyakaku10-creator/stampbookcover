@@ -1032,12 +1032,6 @@ export default function CoverDesignerPage() {
           <Magnet size={15} />
         </button>
         <span style={{ color: 'var(--border)' }}>|</span>
-        <button onClick={duplicateSelected} style={S.btn()}>
-          <Copy size={13} /> 複製
-        </button>
-        <button onClick={deleteSelected} style={S.btn(false, true)}>
-          <Trash2 size={13} /> 削除
-        </button>
         <button onClick={exportJPEG} style={S.btn()}>
           <Download size={13} /> JPEG
         </button>

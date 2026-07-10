@@ -494,7 +494,10 @@ export default function CoverDesignerPage() {
             canvas.setActiveObject(obj);
             canvas.renderAll();
           }
-          // 図形ツールは維持（連続配置可能）
+          activeToolRef.current = 'select';
+          setActiveTool('select');
+          canvas.selection = true;
+          canvas.defaultCursor = 'default';
         }
       });
     });

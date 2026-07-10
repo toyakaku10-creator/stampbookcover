@@ -869,7 +869,7 @@ export default function StampEditorPage() {
               const isActive = tool === 'polygon';
               return (
                 <div key={t.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <button title={t.title} onClick={() => setTool('polygon')} style={S.toolBtn(isActive)}>
+                  <button title={t.title} onClick={() => setTool(isActive ? 'select' : 'polygon')} style={S.toolBtn(isActive)}>
                     {t.icon}
                   </button>
                   {isActive && (

@@ -769,6 +769,18 @@ export default function CoverDesignerPage() {
 
   const toggle = (key: string) => setExpandedSection(s => s === key ? '' : key);
 
+  const toggleShapeSection = () => {
+    if (expandedSection === 'shape' && activeTool === 'polygon') {
+      setActiveTool('select');
+      activeToolRef.current = 'select';
+      if (fabricRef.current) {
+        fabricRef.current.selection = true;
+        fabricRef.current.defaultCursor = 'default';
+      }
+    }
+    setExpandedSection(s => s === 'shape' ? '' : 'shape');
+  };
+
   // ── プレビュー ────────────────────────────────────────────────────
   const openPreview = useCallback(() => {
     if (!fabricRef.current) return;
@@ -1185,7 +1197,7 @@ export default function CoverDesignerPage() {
 
           {/* 4. 図形 — 折りたたみ */}
           <div>
-            <button onClick={() => toggle('shape')}
+            <button onClick={toggleShapeSection}
               style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', ...S.sectionTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>図形</span>
               {expandedSection === 'shape' ? <ChevronUp size={12} /> : <ChevronDown size={12} />}

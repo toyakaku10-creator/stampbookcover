@@ -199,6 +199,9 @@ export default function CoverDesignerPage() {
   const [cols, setCols] = useState(3);
   const [rows, setRows] = useState(4);
 
+  // 多角形の角数
+  const [polygonSides, setPolygonSides] = useState(5);
+
   // エリア指定
   const [areaMode, setAreaMode] = useState<'full' | 'custom'>('full');
   const [customArea, setCustomArea] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
@@ -233,6 +236,7 @@ export default function CoverDesignerPage() {
   useEffect(() => { stampsRef.current = stamps; }, [stamps]);
   useEffect(() => { stampSizeRef.current = stampSize; }, [stampSize]);
   useEffect(() => { bgColorRef.current = bgColor; localStorage.setItem('coverdesigner-canvas-bg', bgColor); }, [bgColor]);
+  useEffect(() => { if (fabricRef.current) fabricRef.current.polygonSides = polygonSides; }, [polygonSides]);
 
   // ── アンドゥ ──────────────────────────────────────────────────────
   const saveHistory = useCallback(() => {
@@ -1220,6 +1224,15 @@ export default function CoverDesignerPage() {
                     </button>
                   </div>
                 )}
+                {/* 多角形の角数 — 常設 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
+                  <span style={{ fontSize: 10, color: '#888', flex: 1 }}>多角形の角数</span>
+                  <button onClick={() => setPolygonSides(s => Math.max(3, s - 1))}
+                    style={{ width: 20, height: 20, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                  <span style={{ width: 20, textAlign: 'center', fontSize: 12, fontWeight: 600 }}>{polygonSides}</span>
+                  <button onClick={() => setPolygonSides(s => Math.min(12, s + 1))}
+                    style={{ width: 20, height: 20, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>＋</button>
+                </div>
               </div>
             )}
           </div>

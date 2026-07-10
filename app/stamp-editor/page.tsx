@@ -926,16 +926,17 @@ export default function StampEditorPage() {
               onChange={e => setStrokeWidth(Number(e.target.value))} style={{ width: '100%' }} />
           </div>
 
-          {/* 多角形：角数スライダー */}
-          {tool === 'polygon' && (
-            <div>
-              <div style={{ ...S.label, display: 'flex', justifyContent: 'space-between' }}>
-                <span>角数</span><span style={{ color: 'var(--accent)' }}>{polygonSides}</span>
-              </div>
-              <input type="range" min="3" max="12" value={polygonSides}
-                onChange={e => setPolygonSides(Number(e.target.value))} style={{ width: '100%' }} />
+          {/* 多角形：角数 — 常設 */}
+          <div>
+            <div style={S.label}>多角形の角数</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button onClick={() => setPolygonSides(s => Math.max(3, s - 1))}
+                style={{ width: 24, height: 24, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+              <span style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>{polygonSides}</span>
+              <button onClick={() => setPolygonSides(s => Math.min(12, s + 1))}
+                style={{ width: 24, height: 24, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>＋</button>
             </div>
-          )}
+          </div>
 
           {/* テキスト専用オプション */}
           {isText && (

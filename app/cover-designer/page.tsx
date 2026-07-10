@@ -906,12 +906,13 @@ export default function CoverDesignerPage() {
       console.log('ZOOM_FIX(理論値):', ZOOM_FIX.toFixed(3), 'dyFixed:', dyFixed.toFixed(1), 'dhFixed:', dhFixed.toFixed(1));
 
       // 背表紙：外側クリップ確定 → 下地（保険）→ 画像（すべて同じパス基準・同一save内）
+      // 底辺はlineTo（直線）：シアー変換後の画像底辺も対角直線のため、Bezierにすると隙間が生じる
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(spineLeft, 55);
       ctx.quadraticCurveTo(spineLeft - 4, 59, spineRight, 70);
       ctx.lineTo(spineRight, 330);
-      ctx.quadraticCurveTo(spineLeft - 4, 319, spineLeft, 315);
+      ctx.lineTo(spineLeft, 315);
       ctx.closePath();
       ctx.clip();
       ctx.fillStyle = '#3a3a3a';
@@ -919,11 +920,9 @@ export default function CoverDesignerPage() {
       // 画像描画：シアー変換 → 内側クリップ（spineLeft-4まで拡張）→ 画像
       ctx.transform(1, 15 / previewSpineW, 0, 1, spineLeft, 55);
       const SHEAR_COMPENSATE = 80;
-      const extraH = 8;
-      const extraBottom = 6;
-      const leftExt = 4;
-      const dh = 260 + extraH + extraBottom;
-      const sh = Math.min(bookHeightPxY * dh / 260, imgH - bookStartPxY);
+      const leftExt = 4;  // 外側クリップの最大張り出し点（spineLeft-4）まで確実にカバー
+      const dh = 260;
+      const sh = Math.min(bookHeightPxY, imgH - bookStartPxY);
       ctx.beginPath();
       ctx.rect(-leftExt, 80 - SHEAR_COMPENSATE, previewSpineW + leftExt, dh);
       ctx.clip();
@@ -943,7 +942,7 @@ export default function CoverDesignerPage() {
       ctx.moveTo(spineLeft, 55);
       ctx.quadraticCurveTo(spineLeft - 4, 59, spineRight, 70);
       ctx.lineTo(spineRight, 330);
-      ctx.quadraticCurveTo(spineLeft - 4, 319, spineLeft, 315);
+      ctx.lineTo(spineLeft, 315);
       ctx.closePath();
       ctx.strokeStyle = '#C0B8A8';
       ctx.lineWidth = 0.8;
@@ -959,7 +958,7 @@ export default function CoverDesignerPage() {
       ctx.moveTo(spineLeft, 55);
       ctx.quadraticCurveTo(spineLeft - 4, 59, spineRight, 70);
       ctx.lineTo(spineRight, 330);
-      ctx.quadraticCurveTo(spineLeft - 4, 319, spineLeft, 315);
+      ctx.lineTo(spineLeft, 315);
       ctx.closePath();
       ctx.fill();
       ctx.restore();

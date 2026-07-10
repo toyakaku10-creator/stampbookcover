@@ -181,7 +181,6 @@ export default function CoverDesignerPage() {
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
   const [canUndo, setCanUndo] = useState(false);
-  const restoringRef = useRef(false);
   const isBatchingRef = useRef(false);
 
   // スナップ
@@ -237,45 +236,40 @@ export default function CoverDesignerPage() {
 
   // ── アンドゥ ──────────────────────────────────────────────────────
   const saveHistory = useCallback(() => {
-    if (restoringRef.current) return;
-    if (isBatchingRef.current) return;
+    if (isBatchingRef.current || !fabricRef.current) return;
     const canvas = fabricRef.current;
-    if (!canvas) return;
-    try {
-      // UIオーバーレイ（エリア選択枠）を一時除外してからJSON化
-      const areaRect = areaRectRef.current;
-      if (areaRect) canvas.remove(areaRect);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const json: any = canvas.toJSON();
-      json.backgroundColor = undefined; // 背景色は別管理のため除外
-      if (areaRect) canvas.add(areaRect);
-      const trimmed = historyRef.current.slice(0, historyIndexRef.current + 1);
-      trimmed.push(JSON.stringify(json));
-      if (trimmed.length > 50) trimmed.shift();
-      historyRef.current = trimmed;
-      historyIndexRef.current = trimmed.length - 1;
-      setCanUndo(trimmed.length > 1);
-    } catch { /* ignore */ }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json: any = canvas.toJSON(['isOverlay']);
+    json.backgroundColor = undefined;
+    // isOverlay フラグを持つオーバーレイ（エリア選択枠）を履歴から除外
+    json.objects = (json.objects ?? []).filter((o: any) => !o.isOverlay);
+    historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
+    historyRef.current.push(JSON.stringify(json));
+    if (historyRef.current.length > 50) historyRef.current.shift();
+    historyIndexRef.current = historyRef.current.length - 1;
+    setCanUndo(historyIndexRef.current > 0);
   }, []);
 
   const saveHistoryRef = useRef(saveHistory);
   useEffect(() => { saveHistoryRef.current = saveHistory; }, [saveHistory]);
 
+  const beginBatch = useCallback(() => { isBatchingRef.current = true; }, []);
+  const endBatch = useCallback(() => {
+    isBatchingRef.current = false;
+    saveHistoryRef.current();
+  }, []);
+
   const undo = useCallback(() => {
+    if (historyIndexRef.current <= 0 || !fabricRef.current) return;
     const canvas = fabricRef.current;
-    if (!canvas || historyIndexRef.current <= 0) return;
     historyIndexRef.current--;
-    restoringRef.current = true;
+    isBatchingRef.current = true;
     canvas.loadFromJSON(JSON.parse(historyRef.current[historyIndexRef.current]), () => {
       canvas.backgroundColor = bgColorRef.current;
       canvas.renderAll();
-      setTimeout(() => {
-        canvas.backgroundColor = bgColorRef.current;
-        canvas.renderAll();
-        restoringRef.current = false;
-      }, 30);
+      isBatchingRef.current = false;
+      setCanUndo(historyIndexRef.current > 0);
     });
-    setCanUndo(historyIndexRef.current > 0);
   }, []);
 
   useEffect(() => {
@@ -351,23 +345,24 @@ export default function CoverDesignerPage() {
       const savedState = localStorage.getItem('coverdesigner-canvas-state');
       const savedBg = localStorage.getItem('coverdesigner-canvas-bg') || '#ffffff';
       bgColorRef.current = savedBg;
-      restoringRef.current = true;
+      isBatchingRef.current = true;
       if (savedState) {
         canvas.loadFromJSON(JSON.parse(savedState), () => {
           canvas.backgroundColor = savedBg;
           canvas.renderAll();
-          restoringRef.current = false;
+          isBatchingRef.current = false;
           saveHistoryRef.current();
           setTimeout(() => canvas.renderAll(), 50);
         });
       } else {
         canvas.backgroundColor = savedBg;
         canvas.renderAll();
-        restoringRef.current = false;
+        isBatchingRef.current = false;
         saveHistoryRef.current();
       }
 
       // ヒストリー
+      canvas.on('object:added', () => saveHistoryRef.current());
       canvas.on('object:modified', () => saveHistoryRef.current());
       canvas.on('object:removed', () => saveHistoryRef.current());
 
@@ -419,6 +414,7 @@ export default function CoverDesignerPage() {
           strokeDashArray: [8, 4],
           selectable: false,
           evented: false,
+          isOverlay: true,
         });
         areaRectRef.current = rect;
         canvas.add(rect);
@@ -482,7 +478,6 @@ export default function CoverDesignerPage() {
               canvas.add(group);
               canvas.setActiveObject(group);
               canvas.renderAll();
-              saveHistoryRef.current();
             });
           }
           activeToolRef.current = 'select';
@@ -499,7 +494,6 @@ export default function CoverDesignerPage() {
             canvas.add(obj);
             canvas.setActiveObject(obj);
             canvas.renderAll();
-            saveHistoryRef.current();
           }
           // 図形ツールは維持（連続配置可能）
         }
@@ -563,7 +557,7 @@ export default function CoverDesignerPage() {
     const placeAt = async (positions: { x: number; y: number }[]) => {
       const canvas = fabricRef.current;
       if (!canvas) return;
-      isBatchingRef.current = true;
+      beginBatch();
       try {
         for (let i = 0; i < positions.length; i++) {
           const pos = positions[i];
@@ -581,20 +575,15 @@ export default function CoverDesignerPage() {
           if (naturalSize > 0) group.scale(stampSize / naturalSize);
           canvas.add(group);
         }
-        // 配置後に点線枠を削除（areaRectRef直接削除 + strokeDashArray全検索の併用）
+        // 配置後に点線枠を削除
         if (areaRectRef.current) {
           canvas.remove(areaRectRef.current);
           areaRectRef.current = null;
         }
-        const dashedObjects = canvas.getObjects().filter((obj: any) =>
-          obj.strokeDashArray && obj.strokeDashArray.length > 0
-        );
-        dashedObjects.forEach((obj: any) => canvas.remove(obj));
         canvas.renderAll();
       } finally {
-        isBatchingRef.current = false;
+        endBatch(); // isBatchingRef = false → saveHistory を1回実行
       }
-      saveHistoryRef.current();
       setCustomArea(null);
     };
 
@@ -654,7 +643,7 @@ export default function CoverDesignerPage() {
       }
       await placeAt(positions.slice(0, n));
     }
-  }, [selectedStamps, stamps, arrangement, arrangementCount, stampSize, cols, rows, areaMode, customArea]);
+  }, [selectedStamps, stamps, arrangement, arrangementCount, stampSize, cols, rows, areaMode, customArea, beginBatch, endBatch]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     console.log('handleImageUpload called', e.target.files);
@@ -685,7 +674,6 @@ export default function CoverDesignerPage() {
         canvas.sendObjectToBack ? canvas.sendObjectToBack(img) : canvas.sendToBack(img);
         canvas.renderAll();
         requestAnimationFrame(() => { canvas.renderAll(); });
-        saveHistoryRef.current();
         console.log('image placed on canvas');
       } catch (err) {
         console.error('FabricImage.fromURL error:', err);
@@ -732,9 +720,10 @@ export default function CoverDesignerPage() {
 
   const clearAll = () => {
     if (!fabricRef.current) return;
+    beginBatch();
     fabricRef.current.remove(...fabricRef.current.getObjects());
     fabricRef.current.renderAll();
-    saveHistoryRef.current();
+    endBatch();
     localStorage.removeItem('coverdesigner-canvas-state');
   };
 
@@ -748,7 +737,6 @@ export default function CoverDesignerPage() {
     canvas.add(cloned);
     canvas.setActiveObject(cloned);
     canvas.renderAll();
-    saveHistoryRef.current();
   };
 
   const applySize = useCallback((wMm: number, hMm: number) => {

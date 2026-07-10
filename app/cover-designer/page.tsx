@@ -1276,6 +1276,16 @@ export default function CoverDesignerPage() {
                       </button>
                     );
                   })}
+                  {/* 画像アップロード（ツール一覧末尾） */}
+                  <label title="画像をアップロード" style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 2, padding: '5px 2px', borderRadius: 6, cursor: 'pointer',
+                    background: 'var(--bg)', color: 'var(--text)', fontSize: 8, fontWeight: 600,
+                  }}>
+                    <ImageIcon size={14} />
+                    画像
+                    <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+                  </label>
                 </div>
                 {activeTool !== 'select' && SHAPE_TOOL_IDS.includes(activeTool as Tool) && (
                   <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1286,23 +1296,6 @@ export default function CoverDesignerPage() {
                     </button>
                   </div>
                 )}
-              </div>
-            )}
-          </div>
-
-          {/* 5. 画像 — 折りたたみ */}
-          <div>
-            <button onClick={() => toggle('img')}
-              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', ...S.sectionTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>画像</span>
-              {expandedSection === 'img' ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
-            {expandedSection === 'img' && (
-              <div style={{ padding: '0 12px 12px' }}>
-                <label style={{ ...S.btn(), display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer' }}>
-                  <ImageIcon size={13} /> 画像をアップロード
-                  <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                </label>
               </div>
             )}
           </div>

@@ -905,6 +905,18 @@ export default function CoverDesignerPage() {
       const dhFixed = 260 + displayHeightExtra;
       console.log('ZOOM_FIX(理論値):', ZOOM_FIX.toFixed(3), 'dyFixed:', dyFixed.toFixed(1), 'dhFixed:', dhFixed.toFixed(1));
 
+      // 背表紙：下地（画像が届かない隙間を影色で塗る）
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(spineLeft, 55);
+      ctx.quadraticCurveTo(spineLeft - 4, 59, spineRight, 70);
+      ctx.lineTo(spineRight, 330);
+      ctx.quadraticCurveTo(spineLeft - 4, 319, spineLeft, 315);
+      ctx.closePath();
+      ctx.fillStyle = '#3a3a3a';
+      ctx.fill();
+      ctx.restore();
+
       // 背表紙：画像（スパイン形状にクリップして描画）
       ctx.save();
       ctx.beginPath();

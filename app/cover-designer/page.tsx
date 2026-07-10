@@ -564,35 +564,36 @@ export default function CoverDesignerPage() {
       const canvas = fabricRef.current;
       if (!canvas) return;
       isBatchingRef.current = true;
-      for (let i = 0; i < positions.length; i++) {
-        const pos = positions[i];
-        const sid = selectedStamps[i % selectedStamps.length];
-        const stamp = stamps.find(s => s.id === sid);
-        if (!stamp) continue;
-        const json = stamp.fabricJSON as { objects?: object[] };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const enlivened: any[] = await fabric.util.enlivenObjects([...(json.objects || [])]);
-        if (!enlivened || !enlivened.length) continue;
-        const group = new fabric.Group(enlivened, {
-          left: pos.x, top: pos.y, originX: 'center', originY: 'center',
-        });
-        const naturalSize = Math.max(group.width ?? 1, group.height ?? 1);
-        if (naturalSize > 0) group.scale(stampSize / naturalSize);
-        canvas.add(group);
-      }
-      // 配置後に点線枠を削除（areaRectRef直接削除 + strokeDashArray全検索の併用）
-      if (canvas && areaRectRef.current) {
-        canvas.remove(areaRectRef.current);
-        areaRectRef.current = null;
-      }
-      if (canvas) {
+      try {
+        for (let i = 0; i < positions.length; i++) {
+          const pos = positions[i];
+          const sid = selectedStamps[i % selectedStamps.length];
+          const stamp = stamps.find(s => s.id === sid);
+          if (!stamp) continue;
+          const json = stamp.fabricJSON as { objects?: object[] };
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const enlivened: any[] = await fabric.util.enlivenObjects([...(json.objects || [])]);
+          if (!enlivened || !enlivened.length) continue;
+          const group = new fabric.Group(enlivened, {
+            left: pos.x, top: pos.y, originX: 'center', originY: 'center',
+          });
+          const naturalSize = Math.max(group.width ?? 1, group.height ?? 1);
+          if (naturalSize > 0) group.scale(stampSize / naturalSize);
+          canvas.add(group);
+        }
+        // 配置後に点線枠を削除（areaRectRef直接削除 + strokeDashArray全検索の併用）
+        if (areaRectRef.current) {
+          canvas.remove(areaRectRef.current);
+          areaRectRef.current = null;
+        }
         const dashedObjects = canvas.getObjects().filter((obj: any) =>
           obj.strokeDashArray && obj.strokeDashArray.length > 0
         );
         dashedObjects.forEach((obj: any) => canvas.remove(obj));
+        canvas.renderAll();
+      } finally {
+        isBatchingRef.current = false;
       }
-      canvas.renderAll();
-      isBatchingRef.current = false;
       saveHistoryRef.current();
       setCustomArea(null);
     };

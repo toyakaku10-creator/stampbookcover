@@ -927,6 +927,7 @@ export default function CoverDesignerPage() {
       ctx.beginPath();
       const dh = 260 + extraH + extraBottom;
       const sh = bookHeightPxY * dh / 260;
+      console.log('sy:', bookStartPxY, 'sh:', sh, 'sy+sh:', bookStartPxY + sh, 'imgH:', imgH);
       ctx.rect(-leftExt, 80 - SHEAR_COMPENSATE, previewSpineW + leftExt, dh);
       ctx.clip();
       ctx.scale(-1, 1);

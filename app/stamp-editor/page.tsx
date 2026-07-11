@@ -919,17 +919,22 @@ export default function StampEditorPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button title={`スナップ ${snapEnabled ? 'ON' : 'OFF'}`}
             onClick={() => setSnapEnabled(v => !v)}
-            style={S.tbBtn(snapEnabled)}>
+            style={S.tbBtn(snapEnabled)}
+            onMouseEnter={e => { if (!snapEnabled) e.currentTarget.style.background = '#243F66'; }}
+            onMouseLeave={e => { if (!snapEnabled) e.currentTarget.style.background = '#1A3358'; }}>
             <Magnet size={14} />
           </button>
           <button title="元に戻す (Ctrl+Z)" onClick={undo} disabled={!canUndo}
-            style={{ ...S.tbBtn(), opacity: canUndo ? 1 : 0.4, cursor: canUndo ? 'pointer' : 'not-allowed' }}>
+            style={{ ...S.tbBtn(), opacity: canUndo ? 1 : 0.4, cursor: canUndo ? 'pointer' : 'default' }}
+            onMouseEnter={e => { if (canUndo) e.currentTarget.style.background = '#243F66'; }}
+            onMouseLeave={e => { if (canUndo) e.currentTarget.style.background = '#1A3358'; }}>
             <Undo2 size={14} />
           </button>
-          <button title="全消去" onClick={clearCanvas}
+          <button title="全消去"
+            onClick={() => { if (!window.confirm('すべて削除しますか？')) return; clearCanvas(); }}
             style={{ ...S.tbBtn(), color: '#6B7A99' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#E05A5A')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#6B7A99')}>
+            onMouseEnter={e => { e.currentTarget.style.background = '#2A1A1A'; e.currentTarget.style.color = '#E05A5A'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#1A3358'; e.currentTarget.style.color = '#6B7A99'; }}>
             <Trash2 size={14} />
           </button>
         </div>

@@ -152,6 +152,8 @@ export default function StampEditorPage() {
   // 直線ハンドル管理
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lineHandlesRef     = useRef<{ h1: any; h2: any; line: any } | null>(null);
+  const lineStartRef       = useRef<{ x: number; y: number } | null>(null);
+  const previewLineRef     = useRef<any>(null);
 
   const [tool, setTool]           = useState<Tool>('select');
   // 統一プロパティパネル用 state（配置デフォルト兼選択オブジェクト反映）
@@ -433,6 +435,17 @@ export default function StampEditorPage() {
         return points;
       };
 
+      // 直線プレビュー更新
+      canvas.on('mouse:move', (opt: any) => {
+        if (lineStartRef.current && previewLineRef.current) {
+          const p = opt.pointer ?? (opt.e ? canvas.getScenePoint(opt.e) : null);
+          if (p) {
+            previewLineRef.current.set({ x2: p.x, y2: p.y });
+            canvas.renderAll();
+          }
+        }
+      });
+
       // スナップ（頂点＋BBoxベース、最近傍ペア優先）
       const SNAP_THRESHOLD = 6;
       canvas.on('object:moving', (e: any) => {
@@ -509,6 +522,41 @@ export default function StampEditorPage() {
         const pt = opt.pointer ?? (opt.e ? canvas.getScenePoint(opt.e) : null);
         if (!pt) return;
         const { x, y } = pt;
+
+        // 直線：2クリック方式
+        if (mode === 'line') {
+          if (!lineStartRef.current) {
+            // 1回目：始点を記録してプレビュー線を表示
+            lineStartRef.current = { x, y };
+            const strokeColor = fabricRef.current?.drawColor ?? GOLD;
+            const preview = new fabric.Line([x, y, x, y], {
+              stroke: strokeColor, strokeWidth: 1.5, strokeDashArray: [4, 4],
+              selectable: false, evented: false,
+            });
+            previewLineRef.current = preview;
+            canvas.add(preview);
+          } else {
+            // 2回目：終点を確定して本番直線を配置
+            const start = lineStartRef.current;
+            if (previewLineRef.current) canvas.remove(previewLineRef.current);
+            const strokeColor = fabricRef.current?.drawColor ?? GOLD;
+            const sw = fabricRef.current?.strokeW ?? 1.5;
+            const line = new fabric.Line([start.x, start.y, x, y], {
+              stroke: strokeColor, strokeWidth: sw, strokeUniform: true,
+            });
+            canvas.add(line);
+            canvas.setActiveObject(line);
+            canvas.renderAll();
+            lineStartRef.current = null;
+            previewLineRef.current = null;
+            setTool('select');
+            toolRef.current                 = 'select';
+            fabricRef.current.selection     = true;
+            fabricRef.current.defaultCursor = 'default';
+            fabricRef.current.hoverCursor   = 'move';
+          }
+          return;
+        }
 
         const obj = buildObjectAt(fabric, fabricRef.current, mode, x, y);
         if (obj) {

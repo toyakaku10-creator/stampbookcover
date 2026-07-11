@@ -209,6 +209,8 @@ export default function CoverDesignerPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const areaRectRef = useRef<any>(null); // 点線枠（ドラッグ中も配置待ちも同じRef）
   const isAreaSelectingRef = useRef(false); // Fabricイベントハンドラ内で参照するRef
+  const lineStartRef = useRef<{ x: number; y: number } | null>(null);
+  const previewLineRef = useRef<any>(null);
 
   const setTool = (tool: string) => {
     setActiveTool(tool);
@@ -426,6 +428,14 @@ export default function CoverDesignerPage() {
       });
 
       canvas.on('mouse:move', (opt: any) => {
+        // 直線プレビュー更新
+        if (lineStartRef.current && previewLineRef.current) {
+          const p = opt.scenePoint ?? opt.pointer;
+          if (p) {
+            previewLineRef.current.set({ x2: p.x, y2: p.y });
+            canvas.renderAll();
+          }
+        }
         if (!isDraggingRef.current || !dragStartRef.current) return;
         const p = getPt(opt);
         const left = Math.min(dragStartRef.current.x, p.x);
@@ -489,7 +499,41 @@ export default function CoverDesignerPage() {
           return;
         }
 
-        // 図形配置
+        // 直線：2クリック方式
+        if (tool === 'line') {
+          if (!lineStartRef.current) {
+            // 1回目：始点を記録してプレビュー線を表示
+            lineStartRef.current = { x, y };
+            const strokeColor = canvas.drawColor ?? '#C9A84C';
+            const preview = new fabric.Line([x, y, x, y], {
+              stroke: strokeColor, strokeWidth: 1.5, strokeDashArray: [4, 4],
+              selectable: false, evented: false,
+            });
+            previewLineRef.current = preview;
+            canvas.add(preview);
+          } else {
+            // 2回目：終点を確定して本番直線を配置
+            const start = lineStartRef.current;
+            if (previewLineRef.current) canvas.remove(previewLineRef.current);
+            const strokeColor = canvas.drawColor ?? '#C9A84C';
+            const sw = canvas.strokeW ?? 1.5;
+            const line = new fabric.Line([start.x, start.y, x, y], {
+              stroke: strokeColor, strokeWidth: sw, strokeUniform: true,
+            });
+            canvas.add(line);
+            canvas.setActiveObject(line);
+            canvas.renderAll();
+            lineStartRef.current = null;
+            previewLineRef.current = null;
+            activeToolRef.current = 'select';
+            setActiveTool('select');
+            canvas.selection = true;
+            canvas.defaultCursor = 'default';
+          }
+          return;
+        }
+
+        // その他の図形配置
         if (SHAPE_TOOL_IDS.includes(tool as Tool)) {
           const obj = buildObjectAt(fabric, canvas, tool as Tool, x, y);
           if (obj) {

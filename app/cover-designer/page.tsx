@@ -370,13 +370,53 @@ export default function CoverDesignerPage() {
       canvas.on('object:modified', () => saveHistoryRef.current());
       canvas.on('object:removed', () => saveHistoryRef.current());
 
-      // スナップ
+      // スナップ（オブジェクト間：BBox4隅・中心・polygon頂点）
+      const getSnapPoints = (obj: any): { x: number; y: number }[] => {
+        const br = obj.getBoundingRect(true);
+        const points = [
+          { x: br.left,                y: br.top                 },
+          { x: br.left + br.width,     y: br.top                 },
+          { x: br.left,                y: br.top + br.height     },
+          { x: br.left + br.width,     y: br.top + br.height     },
+          { x: br.left + br.width / 2, y: br.top + br.height / 2 },
+        ];
+        if (obj.points) {
+          const matrix = obj.calcTransformMatrix();
+          obj.points.forEach((p: any) => {
+            const tp = fabric.util.transformPoint(
+              { x: p.x - (obj.pathOffset?.x ?? 0), y: p.y - (obj.pathOffset?.y ?? 0) },
+              matrix,
+            );
+            points.push({ x: tp.x, y: tp.y });
+          });
+        }
+        return points;
+      };
+
+      const SNAP_THRESHOLD = 6;
       canvas.on('object:moving', (e: any) => {
         if (!snapOnRef.current || !e.target) return;
-        e.target.set({
-          left: Math.round(e.target.left / SNAP_GRID) * SNAP_GRID,
-          top: Math.round(e.target.top / SNAP_GRID) * SNAP_GRID,
+        const moving = e.target;
+        const others = canvas.getObjects().filter((o: any) => o !== moving && !o.isOverlay);
+        const movingPoints = getSnapPoints(moving);
+        let bestDist = SNAP_THRESHOLD * SNAP_THRESHOLD;
+        let snapDx = 0, snapDy = 0;
+
+        others.forEach((obj: any) => {
+          const targetPoints = getSnapPoints(obj);
+          movingPoints.forEach(mp => {
+            targetPoints.forEach(tp => {
+              const dx = tp.x - mp.x, dy = tp.y - mp.y;
+              const dist = dx * dx + dy * dy;
+              if (dist < bestDist) { bestDist = dist; snapDx = dx; snapDy = dy; }
+            });
+          });
         });
+
+        if (bestDist < SNAP_THRESHOLD * SNAP_THRESHOLD) {
+          moving.set({ left: (moving.left ?? 0) + snapDx, top: (moving.top ?? 0) + snapDy });
+        }
+        moving.setCoords();
       });
 
       // 選択

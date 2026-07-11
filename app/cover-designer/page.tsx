@@ -717,14 +717,21 @@ export default function CoverDesignerPage() {
       await placeAt(positions.slice(0, n));
 
     } else if (arrangement === 'frame') {
-      const fw = area.width, fh = area.height;
+      const margin = stampSize / 2;
+      const inner = {
+        left: area.left + margin,
+        top: area.top + margin,
+        width: Math.max(1, area.width - margin * 2),
+        height: Math.max(1, area.height - margin * 2),
+      };
+      const fw = inner.width, fh = inner.height;
       const perim = 2 * (fw + fh);
       await placeAt(Array.from({ length: n }, (_, i) => {
         const t = (i / n) * perim;
-        if (t < fw)           return { x: area.left + t,        y: area.top };
-        if (t < fw + fh)      return { x: area.left + fw,       y: area.top + (t - fw) };
-        if (t < fw * 2 + fh)  return { x: area.left + fw - (t - fw - fh), y: area.top + fh };
-        return { x: area.left, y: area.top + fh - (t - fw * 2 - fh) };
+        if (t < fw)           return { x: inner.left + t,        y: inner.top };
+        if (t < fw + fh)      return { x: inner.left + fw,       y: inner.top + (t - fw) };
+        if (t < fw * 2 + fh)  return { x: inner.left + fw - (t - fw - fh), y: inner.top + fh };
+        return { x: inner.left, y: inner.top + fh - (t - fw * 2 - fh) };
       }));
 
     } else if (arrangement === 'wave') {

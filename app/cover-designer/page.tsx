@@ -114,6 +114,19 @@ const S = {
     background: active ? 'var(--accent)' : 'var(--bg)',
     color: active ? '#1A1A1A' : 'var(--text)',
   }),
+  tbBtn: (active = false): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '6px 10px',
+    borderRadius: 6,
+    background: active ? '#C9A84C' : '#1A3358',
+    color: active ? '#0F2340' : '#F5F0E8',
+    border: '1px solid #2A4570',
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap' as const,
+    transition: 'background 0.15s',
+  }),
 };
 
 function NumberStepper({ label, value, onChange, min, max, step = 1 }: {
@@ -1144,20 +1157,24 @@ export default function CoverDesignerPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button onClick={() => { const next = !snapOn; setSnapOn(next); snapOnRef.current = next; }}
             title={snapOn ? 'スナップON' : 'スナップOFF'}
-            style={S.iconBtn(snapOn)}>
-            <Magnet size={15} />
+            style={S.tbBtn(snapOn)}
+            onMouseEnter={e => { if (!snapOn) e.currentTarget.style.background = '#243F66'; }}
+            onMouseLeave={e => { if (!snapOn) e.currentTarget.style.background = '#1A3358'; }}>
+            <Magnet size={14} />
           </button>
           <button onClick={undo} disabled={!canUndo} title="元に戻す (Ctrl+Z)"
-            style={{ ...S.iconBtn(), opacity: canUndo ? 1 : 0.35, cursor: canUndo ? 'pointer' : 'default' }}>
-            <Undo2 size={15} />
+            style={{ ...S.tbBtn(), opacity: canUndo ? 1 : 0.4, cursor: canUndo ? 'pointer' : 'default' }}
+            onMouseEnter={e => { if (canUndo) e.currentTarget.style.background = '#243F66'; }}
+            onMouseLeave={e => { if (canUndo) e.currentTarget.style.background = '#1A3358'; }}>
+            <Undo2 size={14} />
           </button>
           <button
             onClick={() => { if (!window.confirm('すべて削除しますか？')) return; clearAll(); }}
             title="全クリア"
-            style={{ ...S.iconBtn(), color: '#6B7A99' }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#E05A5A'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#6B7A99'; }}>
-            <Trash2 size={15} />
+            style={{ ...S.tbBtn(), color: '#6B7A99' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#2A1A1A'; e.currentTarget.style.color = '#E05A5A'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#1A3358'; e.currentTarget.style.color = '#6B7A99'; }}>
+            <Trash2 size={14} />
           </button>
         </div>
 
@@ -1166,12 +1183,16 @@ export default function CoverDesignerPage() {
         {/* ② 表示系 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button onClick={() => setShowSizeModal(true)} title="サイズ変更"
-            style={{ ...S.iconBtn(), display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 6px' }}>
-            <Maximize2 size={13} />
-            <span style={{ color: 'var(--accent)' }}>{currentTotalW}×{currentTotalH}mm</span>
+            style={{ ...S.tbBtn(), minWidth: 'fit-content' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#243F66'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#1A3358'; }}>
+            <Maximize2 size={14} />
+            <span style={{ color: '#C9A84C' }}>{currentTotalW}×{currentTotalH}mm</span>
           </button>
-          <button onClick={openPreview} style={S.btn()}>
-            <BookOpen size={13} /> プレビュー
+          <button onClick={openPreview} style={S.tbBtn()}
+            onMouseEnter={e => { e.currentTarget.style.background = '#243F66'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#1A3358'; }}>
+            <BookOpen size={14} /> プレビュー
           </button>
         </div>
 
@@ -1179,8 +1200,10 @@ export default function CoverDesignerPage() {
 
         {/* ③ 出力系（ドロップダウン） */}
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setShowExportMenu(v => !v)} style={{ ...S.btn(showExportMenu), display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Download size={13} /> 書き出し <ChevronDown size={11} />
+          <button onClick={() => setShowExportMenu(v => !v)} style={{ ...S.tbBtn(showExportMenu), gap: 6 }}
+            onMouseEnter={e => { if (!showExportMenu) e.currentTarget.style.background = '#243F66'; }}
+            onMouseLeave={e => { if (!showExportMenu) e.currentTarget.style.background = '#1A3358'; }}>
+            <Download size={14} /> 書き出し <ChevronDown size={11} />
           </button>
           {showExportMenu && (
             <>

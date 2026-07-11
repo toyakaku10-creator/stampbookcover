@@ -1231,71 +1231,63 @@ export default function CoverDesignerPage() {
             )}
           </div>
 
-          {/* 3. 図形 — 折りたたみ */}
-          <div>
-            <button onClick={toggleShapeSection}
-              style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', ...S.sectionTitle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>図形</span>
-              {expandedSection === 'shape' ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            </button>
-            {expandedSection === 'shape' && (
-              <div style={{ padding: '0 12px 12px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
-                  {SHAPE_TOOLS.map(t => {
-                    const isActive = activeTool === t.id;
-                    const btnStyle = {
-                      display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
-                      gap: 2, padding: '5px 2px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                      background: isActive ? 'var(--accent)' : 'var(--bg)',
-                      color: isActive ? '#1A1A1A' : 'var(--text)',
-                      fontSize: 8, fontWeight: 600, width: '100%',
-                    };
-                    if (t.id === 'polygon') {
-                      return (
-                        <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <button onClick={() => setTool(isActive ? 'select' : 'polygon')} title={t.title} style={btnStyle}>
-                            {t.icon}多角
-                          </button>
-                          {isActive && (
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                              <button onClick={() => setPolygonSides(s => Math.max(3, s - 1))}
-                                style={{ width: 16, height: 16, border: '1px solid var(--border)', borderRadius: 3, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 10, padding: 0, lineHeight: 1 }}>−</button>
-                              <span style={{ width: 18, textAlign: 'center', fontSize: 10, fontWeight: 700 }}>{polygonSides}</span>
-                              <button onClick={() => setPolygonSides(s => Math.min(12, s + 1))}
-                                style={{ width: 16, height: 16, border: '1px solid var(--border)', borderRadius: 3, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 10, padding: 0, lineHeight: 1 }}>＋</button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    }
-                    return (
-                      <button key={t.id} onClick={() => setTool(isActive && t.id !== 'select' ? 'select' : t.id)}
-                        title={t.title} style={btnStyle}>
-                        {t.icon}
-                        {t.title.length <= 3 ? t.title : t.title.slice(0, 3)}
+          {/* 3. 図形 — 常時表示 */}
+          <div style={{ padding: '0 12px 12px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ ...S.sectionTitle, padding: '10px 0 6px' }}>図形</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
+              {SHAPE_TOOLS.map(t => {
+                const isActive = activeTool === t.id;
+                const btnStyle = {
+                  display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center',
+                  gap: 2, padding: '5px 2px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                  background: isActive ? 'var(--accent)' : 'var(--bg)',
+                  color: isActive ? '#1A1A1A' : 'var(--text)',
+                  fontSize: 8, fontWeight: 600, width: '100%',
+                };
+                if (t.id === 'polygon') {
+                  return (
+                    <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <button onClick={() => setTool(isActive ? 'select' : 'polygon')} title={t.title} style={btnStyle}>
+                        {t.icon}多角
                       </button>
-                    );
-                  })}
-                  {/* 画像アップロード（ツール一覧末尾） */}
-                  <label title="画像をアップロード" style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 2, padding: '5px 2px', borderRadius: 6, cursor: 'pointer',
-                    background: 'var(--bg)', color: 'var(--text)', fontSize: 8, fontWeight: 600,
-                  }}>
-                    <ImageIcon size={14} />
-                    画像
-                    <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                  </label>
-                </div>
-                {activeTool !== 'select' && SHAPE_TOOL_IDS.includes(activeTool as Tool) && (
-                  <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    クリックして配置
-                    <button onClick={() => setTool('select')}
-                      style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>
-                      <X size={11} />
-                    </button>
-                  </div>
-                )}
+                      {isActive && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                          <button onClick={() => setPolygonSides(s => Math.max(3, s - 1))}
+                            style={{ width: 16, height: 16, border: '1px solid var(--border)', borderRadius: 3, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 10, padding: 0, lineHeight: 1 }}>−</button>
+                          <span style={{ width: 18, textAlign: 'center', fontSize: 10, fontWeight: 700 }}>{polygonSides}</span>
+                          <button onClick={() => setPolygonSides(s => Math.min(12, s + 1))}
+                            style={{ width: 16, height: 16, border: '1px solid var(--border)', borderRadius: 3, background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontSize: 10, padding: 0, lineHeight: 1 }}>＋</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <button key={t.id} onClick={() => setTool(isActive && t.id !== 'select' ? 'select' : t.id)}
+                    title={t.title} style={btnStyle}>
+                    {t.icon}
+                    {t.title.length <= 3 ? t.title : t.title.slice(0, 3)}
+                  </button>
+                );
+              })}
+              {/* 画像アップロード（ツール一覧末尾） */}
+              <label title="画像をアップロード" style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: 2, padding: '5px 2px', borderRadius: 6, cursor: 'pointer',
+                background: 'var(--bg)', color: 'var(--text)', fontSize: 8, fontWeight: 600,
+              }}>
+                <ImageIcon size={14} />
+                画像
+                <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+              </label>
+            </div>
+            {activeTool !== 'select' && SHAPE_TOOL_IDS.includes(activeTool as Tool) && (
+              <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                クリックして配置
+                <button onClick={() => setTool('select')}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>
+                  <X size={11} />
+                </button>
               </div>
             )}
           </div>

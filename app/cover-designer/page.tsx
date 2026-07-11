@@ -1158,7 +1158,7 @@ export default function CoverDesignerPage() {
   ];
 
   return (
-    <div style={{ height: '100vh', overflow: 'hidden', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', overflowX: 'auto', overflowY: 'hidden', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column', minWidth: 'fit-content' }}>
       <AppHeader>
         {/* ① 編集系 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

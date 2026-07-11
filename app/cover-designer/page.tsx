@@ -7,6 +7,7 @@ import {
   Trash2, Copy, Download, Upload, ImageIcon, Minus, Plus,
   Stamp, ChevronDown, ChevronUp, X, Undo2, Magnet, Waves,
   MousePointer2, Square, Circle, Triangle, Type, Maximize2, BookOpen, FileJson,
+  Menu, Settings,
 } from 'lucide-react';
 import type { Stamp as StampType, Tool } from '@/lib/types';
 import { getStamps } from '@/lib/stampStorage';
@@ -198,6 +199,11 @@ export default function CoverDesignerPage() {
   const [snapOn, setSnapOn] = useState(false);
   const snapOnRef = useRef(false);
 
+  // モバイルサイドバー
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
+  const [mobileRightOpen, setMobileRightOpen] = useState(false);
+
   // 右サイドバー プロパティ
   const [hasSelection, setHasSelection] = useState(false);
   const [isStamp, setIsStamp] = useState(false);
@@ -245,6 +251,13 @@ export default function CoverDesignerPage() {
     setIsAreaSelecting(true);
     setAreaMode('custom');
   };
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => { setStamps(getStamps()); }, []);
   useEffect(() => { stampsRef.current = stamps; }, [stamps]);
@@ -1256,7 +1269,7 @@ export default function CoverDesignerPage() {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Left panel */}
-        <div style={{ width: 200, minWidth: 200, maxWidth: 200, background: 'var(--surface)', borderRight: '1px solid var(--border)', overflowY: 'auto', overflowX: 'hidden', scrollbarGutter: 'stable', flexShrink: 0 }}>
+        <div style={{ width: isMobile ? (mobileLeftOpen ? 200 : 0) : 200, minWidth: isMobile ? (mobileLeftOpen ? 200 : 0) : 200, maxWidth: isMobile ? (mobileLeftOpen ? 200 : 0) : 200, background: 'var(--surface)', borderRight: '1px solid var(--border)', overflowY: isMobile && !mobileLeftOpen ? 'hidden' : 'auto', overflowX: 'hidden', scrollbarGutter: 'stable', flexShrink: 0, transition: isMobile ? 'width 0.2s, min-width 0.2s, max-width 0.2s' : 'none' }}>
 
           {/* 1. 背景色 — 常時表示 */}
           <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)' }}>
@@ -1496,6 +1509,18 @@ export default function CoverDesignerPage() {
 
         </div>
 
+        {/* モバイル開閉ボタン */}
+        {isMobile && (
+          <>
+            <button onClick={() => { setMobileLeftOpen(v => !v); setMobileRightOpen(false); }} style={{ position: 'fixed', left: 8, top: 60, zIndex: 1000, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: 6, color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+              <Menu size={18} />
+            </button>
+            <button onClick={() => { setMobileRightOpen(v => !v); setMobileLeftOpen(false); }} style={{ position: 'fixed', right: 8, top: 60, zIndex: 1000, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: 6, color: 'var(--text)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+              <Settings size={18} />
+            </button>
+          </>
+        )}
+
         {/* Canvas */}
         <div ref={canvasContainerRef} style={{ flex: 1, background: '#111', overflow: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: 24, cursor: activeTool === 'select' ? 'default' : 'crosshair' }}>
           <div style={{ boxShadow: '0 0 60px rgba(0,0,0,0.8)', flexShrink: 0 }}>
@@ -1504,7 +1529,7 @@ export default function CoverDesignerPage() {
         </div>
 
         {/* Right panel — プロパティ */}
-        <div style={{ width: 176, minWidth: 176, maxWidth: 176, background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflowY: 'auto', scrollbarGutter: 'stable', flexShrink: 0 }}>
+        <div style={{ width: isMobile ? (mobileRightOpen ? 176 : 0) : 176, minWidth: isMobile ? (mobileRightOpen ? 176 : 0) : 176, maxWidth: isMobile ? (mobileRightOpen ? 176 : 0) : 176, background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflowY: isMobile && !mobileRightOpen ? 'hidden' : 'auto', scrollbarGutter: 'stable', flexShrink: 0, transition: isMobile ? 'width 0.2s, min-width 0.2s, max-width 0.2s' : 'none' }}>
           {!hasSelection ? (
             <div style={{ padding: 16, fontSize: 11, color: '#555', textAlign: 'center', marginTop: 24 }}>
               オブジェクトを<br />選択してください

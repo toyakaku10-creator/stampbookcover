@@ -5,7 +5,7 @@ import AppHeader from '@/components/AppHeader';
 import {
   Grid, Shuffle, AlignCenter,
   Trash2, Copy, Download, ImageIcon, Minus, Plus,
-  Stamp, ChevronDown, ChevronUp, X, Undo2, Magnet, RefreshCw,
+  Stamp, ChevronDown, ChevronUp, X, Undo2, Magnet, Waves,
   MousePointer2, Square, Circle, Triangle, Type,
 } from 'lucide-react';
 import type { Stamp as StampType, Tool } from '@/lib/types';
@@ -67,7 +67,7 @@ const DISP_H = Math.round(INIT_H_PX * INIT_SCALE);
 const SNAP_GRID = 10;
 const BOOK_W = 142, BOOK_H = 152, SPINE_W = 15;
 
-type ArrangementType = 'grid' | 'stagger' | 'frame' | 'concentric';
+type ArrangementType = 'grid' | 'stagger' | 'frame' | 'wave';
 
 const S = {
   label: {
@@ -548,7 +548,7 @@ export default function CoverDesignerPage() {
 
     const canvasW = canvas.width as number;
     const canvasH = canvas.height as number;
-    // グリッド・千鳥は cols×rows が個数、フレーム・同心円は arrangementCount
+    // グリッド・千鳥は cols×rows が個数、フレーム・波は arrangementCount
     const n = (arrangement === 'grid' || arrangement === 'stagger')
       ? Math.max(1, cols) * Math.max(1, rows)
       : arrangementCount;
@@ -629,24 +629,16 @@ export default function CoverDesignerPage() {
         return { x: area.left, y: area.top + fh - (t - fw * 2 - fh) };
       }));
 
-    } else if (arrangement === 'concentric') {
-      const cx = area.left + area.width / 2;
-      const cy = area.top  + area.height / 2;
-      const rings = Math.max(1, Math.round(Math.sqrt(n / Math.PI)));
-      const positions: { x: number; y: number }[] = [];
-      if (n > 0) positions.push({ x: cx, y: cy });
-      let remaining = n - 1;
-      for (let ri = 1; ri <= rings && remaining > 0; ri++) {
-        const rx = (area.width  / 2) * ri / rings;
-        const ry = (area.height / 2) * ri / rings;
-        const count = Math.min(remaining, Math.round(2 * Math.PI * ri * 3));
-        for (let i = 0; i < count; i++) {
-          const a = (2 * Math.PI * i) / count;
-          positions.push({ x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a) });
-        }
-        remaining -= count;
-      }
-      await placeAt(positions.slice(0, n));
+    } else if (arrangement === 'wave') {
+      const amplitude = area.height * 0.25;
+      const wavelength = area.width / 3;
+      const centerY = area.top + area.height / 2;
+      await placeAt(Array.from({ length: n }, (_, i) => {
+        const t = n > 1 ? i / (n - 1) : 0;
+        const x = area.left + area.width * t;
+        const y = centerY + amplitude * Math.sin((x - area.left) / wavelength * Math.PI * 2);
+        return { x, y };
+      }));
     }
   }, [selectedStamps, stamps, arrangement, arrangementCount, stampSize, cols, rows, areaMode, customArea, beginBatch, endBatch]);
 
@@ -1011,7 +1003,7 @@ export default function CoverDesignerPage() {
     { id: 'grid',       icon: <Grid size={14} />,        label: 'グリッド' },
     { id: 'stagger',    icon: <Shuffle size={14} />,     label: '千鳥' },
     { id: 'frame',      icon: <AlignCenter size={14} />, label: 'フレーム' },
-    { id: 'concentric', icon: <RefreshCw size={14} />,   label: '同心円' },
+    { id: 'wave',        icon: <Waves size={14} />,        label: '波' },
   ];
 
   return (

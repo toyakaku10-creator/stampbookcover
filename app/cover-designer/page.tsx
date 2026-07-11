@@ -6,7 +6,7 @@ import {
   Grid, Shuffle, AlignCenter,
   Trash2, Copy, Download, Upload, ImageIcon, Minus, Plus,
   Stamp, ChevronDown, ChevronUp, X, Undo2, Magnet, Waves,
-  MousePointer2, Square, Circle, Triangle, Type,
+  MousePointer2, Square, Circle, Triangle, Type, Maximize2, BookOpen, FileJson,
 } from 'lucide-react';
 import type { Stamp as StampType, Tool } from '@/lib/types';
 import { getStamps } from '@/lib/stampStorage';
@@ -168,6 +168,7 @@ export default function CoverDesignerPage() {
   const currentTotalHRef = useRef(152);
   const dispScaleRef = useRef(INIT_SCALE);
   const [showSizeModal, setShowSizeModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [activeSizeName, setActiveSizeName] = useState('応募サイズ');
   const [customW, setCustomW] = useState(385);
   const [customH, setCustomH] = useState(152);
@@ -1139,47 +1140,88 @@ export default function CoverDesignerPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
       <AppHeader>
-        <button onClick={() => setShowSizeModal(true)}
-          style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>
-          {currentTotalW}×{currentTotalH}mm
-        </button>
-        <span style={{ color: 'var(--border)' }}>|</span>
-        <button onClick={() => { const next = !snapOn; setSnapOn(next); snapOnRef.current = next; }}
-          title={snapOn ? 'スナップON' : 'スナップOFF'}
-          style={S.iconBtn(snapOn)}>
-          <Magnet size={15} />
-        </button>
-        <button onClick={undo} disabled={!canUndo} title="元に戻す (Ctrl+Z)"
-          style={{ ...S.iconBtn(), opacity: canUndo ? 1 : 0.35, cursor: canUndo ? 'pointer' : 'default' }}>
-          <Undo2 size={15} />
-        </button>
-        <div style={{ width: 1, height: 16, background: '#2A4570' }} />
-        <button
-          onClick={() => { if (!window.confirm('すべて削除しますか？')) return; clearAll(); }}
-          title="全クリア"
-          style={{ ...S.iconBtn(), color: '#6B7A99' }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#E05A5A'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = '#6B7A99'; }}>
-          <Trash2 size={15} />
-        </button>
-        <span style={{ color: 'var(--border)' }}>|</span>
-        <button onClick={exportJPEG} style={S.btn()}>
-          <Download size={13} /> JPEG
-        </button>
-        <button onClick={exportPDF} style={{ ...S.btn(true), background: 'var(--accent)', color: '#1A1A1A' }}>
-          <Download size={13} /> PDF
-        </button>
-        <button onClick={openPreview} style={S.btn()}>
-          プレビュー
-        </button>
-        <span style={{ color: 'var(--border)' }}>|</span>
-        <button onClick={exportDesign} style={S.btn()}>
-          <Download size={13} /> 書き出し
-        </button>
-        <label style={{ ...S.btn(), cursor: 'pointer' }}>
-          <Upload size={13} /> 読み込み
-          <input type="file" accept=".json" onChange={importDesign} style={{ display: 'none' }} />
-        </label>
+        {/* ① 編集系 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button onClick={() => { const next = !snapOn; setSnapOn(next); snapOnRef.current = next; }}
+            title={snapOn ? 'スナップON' : 'スナップOFF'}
+            style={S.iconBtn(snapOn)}>
+            <Magnet size={15} />
+          </button>
+          <button onClick={undo} disabled={!canUndo} title="元に戻す (Ctrl+Z)"
+            style={{ ...S.iconBtn(), opacity: canUndo ? 1 : 0.35, cursor: canUndo ? 'pointer' : 'default' }}>
+            <Undo2 size={15} />
+          </button>
+          <button
+            onClick={() => { if (!window.confirm('すべて削除しますか？')) return; clearAll(); }}
+            title="全クリア"
+            style={{ ...S.iconBtn(), color: '#6B7A99' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#E05A5A'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6B7A99'; }}>
+            <Trash2 size={15} />
+          </button>
+        </div>
+
+        <div style={{ width: 1, height: 20, background: '#2A4570' }} />
+
+        {/* ② 表示系 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button onClick={() => setShowSizeModal(true)} title="サイズ変更"
+            style={{ ...S.iconBtn(), display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 6px' }}>
+            <Maximize2 size={13} />
+            <span style={{ color: 'var(--accent)' }}>{currentTotalW}×{currentTotalH}mm</span>
+          </button>
+          <button onClick={openPreview} style={S.btn()}>
+            <BookOpen size={13} /> プレビュー
+          </button>
+        </div>
+
+        <div style={{ width: 1, height: 20, background: '#2A4570' }} />
+
+        {/* ③ 出力系（ドロップダウン） */}
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setShowExportMenu(v => !v)} style={{ ...S.btn(showExportMenu), display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Download size={13} /> 書き出し <ChevronDown size={11} />
+          </button>
+          {showExportMenu && (
+            <>
+              {/* オーバーレイ（クリック外で閉じる） */}
+              <div onClick={() => setShowExportMenu(false)}
+                style={{ position: 'fixed', inset: 0, zIndex: 99 }} />
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', right: 0,
+                background: '#1A3358', border: '1px solid #2A4570',
+                borderRadius: 6, padding: 4, minWidth: 180, zIndex: 100,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              }}>
+                {[
+                  { label: 'JPEGで書き出し',       icon: <Download size={12} />, action: () => { exportJPEG(); setShowExportMenu(false); } },
+                  { label: 'PDFで書き出し',         icon: <Download size={12} />, action: () => { exportPDF();  setShowExportMenu(false); } },
+                ].map(item => (
+                  <button key={item.label} onClick={item.action}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '7px 10px', background: 'none', border: 'none', color: 'var(--text)', fontSize: 12, cursor: 'pointer', borderRadius: 4 }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#2A4570'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}>
+                    {item.icon}{item.label}
+                  </button>
+                ))}
+                <div style={{ borderTop: '1px solid #2A4570', margin: '4px 0' }} />
+                <button onClick={() => { exportDesign(); setShowExportMenu(false); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '7px 10px', background: 'none', border: 'none', color: 'var(--text)', fontSize: 12, cursor: 'pointer', borderRadius: 4 }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#2A4570'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'none'; }}>
+                  <FileJson size={12} />デザインを書き出し（JSON）
+                </button>
+                <label
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '7px 10px', color: 'var(--text)', fontSize: 12, cursor: 'pointer', borderRadius: 4 }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#2A4570'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; }}>
+                  <Upload size={12} />デザインを読み込み（JSON）
+                  <input type="file" accept=".json" onChange={e => { importDesign(e); setShowExportMenu(false); }} style={{ display: 'none' }} />
+                </label>
+              </div>
+            </>
+          )}
+        </div>
       </AppHeader>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

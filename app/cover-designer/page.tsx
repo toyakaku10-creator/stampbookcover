@@ -1504,7 +1504,7 @@ export default function CoverDesignerPage() {
         </div>
 
         {/* Right panel — プロパティ */}
-        <div style={{ width: 176, background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflowY: 'auto', scrollbarGutter: 'stable', flexShrink: 0 }}>
+        <div style={{ width: 176, minWidth: 176, maxWidth: 176, background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflowY: 'auto', scrollbarGutter: 'stable', flexShrink: 0 }}>
           {!hasSelection ? (
             <div style={{ padding: 16, fontSize: 11, color: '#555', textAlign: 'center', marginTop: 24 }}>
               オブジェクトを<br />選択してください

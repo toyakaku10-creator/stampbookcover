@@ -1256,7 +1256,7 @@ export default function CoverDesignerPage() {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Left panel */}
-        <div style={{ width: 200, background: 'var(--surface)', borderRight: '1px solid var(--border)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ width: 200, background: 'var(--surface)', borderRight: '1px solid var(--border)', overflowY: 'scroll', flexShrink: 0 }}>
 
           {/* 1. 背景色 — 常時表示 */}
           <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)' }}>

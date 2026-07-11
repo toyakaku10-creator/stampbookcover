@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import AppHeader from '@/components/AppHeader';
 import {
   Grid, Shuffle, AlignCenter,
-  Trash2, Copy, Download, ImageIcon, Minus, Plus,
+  Trash2, Copy, Download, Upload, ImageIcon, Minus, Plus,
   Stamp, ChevronDown, ChevronUp, X, Undo2, Magnet, Waves,
   MousePointer2, Square, Circle, Triangle, Type,
 } from 'lucide-react';
@@ -1083,6 +1083,52 @@ export default function CoverDesignerPage() {
     if (showPreview && previewDataUrl) drawPreview(previewDataUrl);
   }, [showPreview, previewDataUrl, drawPreview]);
 
+  const exportDesign = () => {
+    if (!fabricRef.current) return;
+    const json = fabricRef.current.toJSON(['isOverlay']);
+    const data = {
+      canvas: json,
+      backgroundColor: bgColorRef.current,
+      totalW: currentTotalW,
+      totalH: currentTotalH,
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cover-design-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importDesign = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !fabricRef.current) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        isBatchingRef.current = true;
+        await fabricRef.current!.loadFromJSON(data.canvas);
+        const newBg = data.backgroundColor || '#ffffff';
+        bgColorRef.current = newBg;
+        setBgColor(newBg);
+        fabricRef.current!.backgroundColor = newBg;
+        if (data.totalW) setCurrentTotalW(data.totalW);
+        if (data.totalH) setCurrentTotalH(data.totalH);
+        fabricRef.current!.renderAll();
+        isBatchingRef.current = false;
+        saveHistoryRef.current();
+      } catch {
+        alert('ファイルの読み込みに失敗しました');
+        isBatchingRef.current = false;
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const ARRANGEMENTS: { id: ArrangementType; icon: React.ReactNode; label: string }[] = [
     { id: 'grid',       icon: <Grid size={14} />,        label: 'グリッド' },
     { id: 'stagger',    icon: <Shuffle size={14} />,     label: '千鳥' },
@@ -1126,6 +1172,14 @@ export default function CoverDesignerPage() {
         <button onClick={openPreview} style={S.btn()}>
           プレビュー
         </button>
+        <span style={{ color: 'var(--border)' }}>|</span>
+        <button onClick={exportDesign} style={S.btn()}>
+          <Download size={13} /> 書き出し
+        </button>
+        <label style={{ ...S.btn(), cursor: 'pointer' }}>
+          <Upload size={13} /> 読み込み
+          <input type="file" accept=".json" onChange={importDesign} style={{ display: 'none' }} />
+        </label>
       </AppHeader>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

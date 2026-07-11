@@ -206,6 +206,7 @@ export default function CoverDesignerPage() {
   const [selStrokeW, setSelStrokeW] = useState(1);
   const [selOpacity, setSelOpacity] = useState(1);
   const [selAngle, setSelAngle] = useState(0);
+  const [selSize, setSelSize] = useState(60);
 
   // 行列数直接指定
   const [cols, setCols] = useState(3);
@@ -313,6 +314,7 @@ export default function CoverDesignerPage() {
     setSelStrokeW(obj.strokeWidth ?? 1);
     setSelOpacity(obj.opacity ?? 1);
     setSelAngle(Math.round(obj.angle ?? 0));
+    setSelSize(Math.round(Math.max(obj.getScaledWidth?.() ?? 0, obj.getScaledHeight?.() ?? 0)));
   }, []);
 
   const updateSelPropsRef = useRef(updateSelProps);
@@ -1539,6 +1541,35 @@ export default function CoverDesignerPage() {
                   </div>
                 </>
               )}
+
+              {/* サイズ */}
+              <div style={S.sectionTitle}>サイズ</div>
+              <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button onClick={() => {
+                  const canvas = fabricRef.current;
+                  const obj = canvas?.getActiveObject();
+                  if (!obj) return;
+                  const cur = Math.max(obj.getScaledWidth(), obj.getScaledHeight());
+                  const next = Math.max(10, cur - 5);
+                  obj.scale((obj.scaleX ?? 1) * next / cur);
+                  canvas.renderAll();
+                  setSelSize(Math.round(next));
+                  saveHistoryRef.current();
+                }} style={S.iconBtn()}><Minus size={12} /></button>
+                <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{selSize}</span>
+                <button onClick={() => {
+                  const canvas = fabricRef.current;
+                  const obj = canvas?.getActiveObject();
+                  if (!obj) return;
+                  const cur = Math.max(obj.getScaledWidth(), obj.getScaledHeight());
+                  const next = cur + 5;
+                  obj.scale((obj.scaleX ?? 1) * next / cur);
+                  canvas.renderAll();
+                  setSelSize(Math.round(next));
+                  saveHistoryRef.current();
+                }} style={S.iconBtn()}><Plus size={12} /></button>
+                <span style={{ fontSize: 11, color: '#888' }}>px</span>
+              </div>
 
               {/* 透明度 */}
               <div style={S.sectionTitle}>透明度</div>

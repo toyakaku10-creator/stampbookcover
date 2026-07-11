@@ -916,7 +916,7 @@ export default function StampEditorPage() {
   return (
     <div style={{ height: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column', overflowX: 'auto', overflowY: 'hidden', minWidth: 'fit-content' }}>
       <AppHeader startChildren={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 600 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 560 }}>
           <button title={`スナップ ${snapEnabled ? 'ON' : 'OFF'}`}
             onClick={() => setSnapEnabled(v => !v)}
             style={S.tbBtn(snapEnabled)}

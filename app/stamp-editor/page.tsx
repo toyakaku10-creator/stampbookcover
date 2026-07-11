@@ -101,6 +101,14 @@ const S = {
     transition: 'background 0.15s',
   }),
   divider: { width: 24, height: 1, background: 'var(--border)', margin: '4px 0' },
+  tbBtn: (active = false): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '6px 10px', borderRadius: 6,
+    background: active ? '#C9A84C' : '#1A3358',
+    color: active ? '#0F2340' : '#F5F0E8',
+    border: '1px solid #2A4570', fontSize: 12, fontWeight: 500,
+    cursor: 'pointer', whiteSpace: 'nowrap' as const, transition: 'background 0.15s',
+  }),
   panel: {
     width: 200, height: '100%', background: 'var(--surface)', borderRight: '1px solid var(--border)',
     overflowY: 'auto' as const, padding: 12, flexShrink: 0,
@@ -907,7 +915,25 @@ export default function StampEditorPage() {
 
   return (
     <div style={{ height: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column', overflowX: 'auto', overflowY: 'hidden', minWidth: 'fit-content' }}>
-      <AppHeader />
+      <AppHeader>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button title={`スナップ ${snapEnabled ? 'ON' : 'OFF'}`}
+            onClick={() => setSnapEnabled(v => !v)}
+            style={S.tbBtn(snapEnabled)}>
+            <Magnet size={14} />
+          </button>
+          <button title="元に戻す (Ctrl+Z)" onClick={undo} disabled={!canUndo}
+            style={{ ...S.tbBtn(), opacity: canUndo ? 1 : 0.4, cursor: canUndo ? 'pointer' : 'not-allowed' }}>
+            <Undo2 size={14} />
+          </button>
+          <button title="全消去" onClick={clearCanvas}
+            style={{ ...S.tbBtn(), color: '#6B7A99' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#E05A5A')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#6B7A99')}>
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </AppHeader>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         {/* ── アイコンツールバー ─────────────────────────────── */}
@@ -938,21 +964,6 @@ export default function StampEditorPage() {
               </button>
             );
           })}
-          <div style={S.divider} />
-          <button title={`スナップ ${snapEnabled ? 'ON' : 'OFF'}`}
-            onClick={() => setSnapEnabled(v => !v)}
-            style={S.toolBtn(snapEnabled)}>
-            <Magnet size={18} />
-          </button>
-          <button title="元に戻す (Ctrl+Z)" onClick={undo} disabled={!canUndo}
-            style={{ ...S.toolBtn(false), opacity: canUndo ? 1 : 0.3, cursor: canUndo ? 'pointer' : 'not-allowed' }}>
-            <Undo2 size={18} />
-          </button>
-
-          <button title="全消去" onClick={clearCanvas}
-            style={{ ...S.toolBtn(false), color: 'var(--danger)', opacity: 0.6 }}>
-            <Trash2 size={18} />
-          </button>
         </div>
 
         {/* ── ② 統一プロパティパネル ────────────────────────── */}

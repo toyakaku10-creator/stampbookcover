@@ -156,8 +156,16 @@ export default function CoverDesignerPage() {
   const [stamps, setStamps] = useState<StampType[]>([]);
   const [arrangement, setArrangement] = useState<ArrangementType>('grid');
   const [arrangementCount, setArrangementCount] = useState(9);
-  const [bgColor, setBgColor] = useState('#ffffff');
-  const bgColorRef = useRef('#ffffff');
+  const [bgColor, setBgColor] = useState(() =>
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('coverdesigner-canvas-bg') || '#ffffff')
+      : '#ffffff'
+  );
+  const bgColorRef = useRef(
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('coverdesigner-canvas-bg') || '#ffffff')
+      : '#ffffff'
+  );
   const [stampSize, setStampSize] = useState(60);
   const stampSizeRef = useRef(60);
   const [selectedStamps, setSelectedStamps] = useState<string[]>([]);
@@ -241,7 +249,7 @@ export default function CoverDesignerPage() {
   useEffect(() => { setStamps(getStamps()); }, []);
   useEffect(() => { stampsRef.current = stamps; }, [stamps]);
   useEffect(() => { stampSizeRef.current = stampSize; }, [stampSize]);
-  useEffect(() => { bgColorRef.current = bgColor; }, [bgColor]);
+  useEffect(() => { bgColorRef.current = bgColor; localStorage.setItem('coverdesigner-canvas-bg', bgColor); }, [bgColor]);
   useEffect(() => { if (fabricRef.current) fabricRef.current.polygonSides = polygonSides; }, [polygonSides]);
 
   // ── アンドゥ ──────────────────────────────────────────────────────
@@ -353,18 +361,19 @@ export default function CoverDesignerPage() {
 
       // 状態復元
       const savedState = localStorage.getItem('coverdesigner-canvas-state');
-      bgColorRef.current = '#ffffff';
+      const savedBg = localStorage.getItem('coverdesigner-canvas-bg') || '#ffffff';
+      bgColorRef.current = savedBg;
       isBatchingRef.current = true;
       if (savedState) {
         canvas.loadFromJSON(JSON.parse(savedState), () => {
-          canvas.backgroundColor = '#ffffff';
+          canvas.backgroundColor = savedBg;
           canvas.renderAll();
           isBatchingRef.current = false;
           saveHistoryRef.current();
           setTimeout(() => canvas.renderAll(), 50);
         });
       } else {
-        canvas.backgroundColor = '#ffffff';
+        canvas.backgroundColor = savedBg;
         canvas.renderAll();
         isBatchingRef.current = false;
         saveHistoryRef.current();
@@ -600,6 +609,7 @@ export default function CoverDesignerPage() {
         try {
           const json = JSON.stringify(canvas.toJSON());
           localStorage.setItem('coverdesigner-canvas-state', json);
+          localStorage.setItem('coverdesigner-canvas-bg', bgColorRef.current);
         } catch { /* ignore */ }
         canvas.dispose();
         canvas = null;

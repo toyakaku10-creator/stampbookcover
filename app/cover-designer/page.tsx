@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import AppHeader from '@/components/AppHeader';
 import {
-  Grid, Shuffle, AlignCenter,
+  Grid, Shuffle, Frame,
   Trash2, Copy, Download, Upload, ImageIcon, Minus, Plus,
   Stamp, ChevronDown, ChevronUp, X, Undo2, Magnet, Waves,
   MousePointer2, Square, Circle, Triangle, Type, Maximize2, BookOpen, FileJson,
@@ -1146,7 +1146,7 @@ export default function CoverDesignerPage() {
   const ARRANGEMENTS: { id: ArrangementType; icon: React.ReactNode; label: string }[] = [
     { id: 'grid',       icon: <Grid size={14} />,        label: 'グリッド' },
     { id: 'stagger',    icon: <Shuffle size={14} />,     label: '千鳥' },
-    { id: 'frame',      icon: <AlignCenter size={14} />, label: 'フレーム' },
+    { id: 'frame',      icon: <Frame size={14} />,       label: 'フレーム' },
     { id: 'wave',        icon: <Waves size={14} />,        label: '波' },
   ];
 

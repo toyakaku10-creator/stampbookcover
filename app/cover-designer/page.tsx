@@ -338,7 +338,7 @@ export default function CoverDesignerPage() {
     let canvas: any;
     let disposed = false;
 
-    import('fabric').then(async (mod: any) => {
+    import('fabric').then((mod: any) => {
       if (disposed) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fabric: any = mod.fabric ?? mod.default ?? mod;
@@ -356,14 +356,13 @@ export default function CoverDesignerPage() {
       bgColorRef.current = '#ffffff';
       isBatchingRef.current = true;
       if (savedState) {
-        const parsed = JSON.parse(savedState);
-        delete parsed.backgroundColor;
-        await canvas.loadFromJSON(parsed);
-        canvas.backgroundColor = '#ffffff';
-        canvas.renderAll();
-        isBatchingRef.current = false;
-        saveHistoryRef.current();
-        setTimeout(() => canvas.renderAll(), 50);
+        canvas.loadFromJSON(JSON.parse(savedState), () => {
+          canvas.backgroundColor = '#ffffff';
+          canvas.renderAll();
+          isBatchingRef.current = false;
+          saveHistoryRef.current();
+          setTimeout(() => canvas.renderAll(), 50);
+        });
       } else {
         canvas.backgroundColor = '#ffffff';
         canvas.renderAll();

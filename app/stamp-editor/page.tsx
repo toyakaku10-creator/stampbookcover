@@ -915,7 +915,7 @@ export default function StampEditorPage() {
 
   return (
     <div style={{ height: '100vh', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column', overflowX: 'auto', overflowY: 'hidden', minWidth: 'fit-content' }}>
-      <AppHeader>
+      <AppHeader startChildren={
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button title={`スナップ ${snapEnabled ? 'ON' : 'OFF'}`}
             onClick={() => setSnapEnabled(v => !v)}
@@ -938,7 +938,7 @@ export default function StampEditorPage() {
             <Trash2 size={14} />
           </button>
         </div>
-      </AppHeader>
+      } />
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         {/* ── アイコンツールバー ─────────────────────────────── */}

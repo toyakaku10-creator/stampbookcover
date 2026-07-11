@@ -7,7 +7,13 @@ import AppTabs from './AppTabs';
  * [STAMP BOOK COVER] [タブ]  ←固定左部→  <children> ←右端→
  * children にページ固有ボタンを渡すと marginLeft:auto で右寄せされる。
  */
-export default function AppHeader({ children }: { children?: React.ReactNode }) {
+export default function AppHeader({
+  children,
+  startChildren,
+}: {
+  children?: React.ReactNode;
+  startChildren?: React.ReactNode;
+}) {
   return (
     <header style={{
       height: 44, flexShrink: 0,
@@ -18,6 +24,11 @@ export default function AppHeader({ children }: { children?: React.ReactNode }) 
         STAMP BOOK COVER
       </span>
       <AppTabs />
+      {startChildren && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {startChildren}
+        </div>
+      )}
       {children && (
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {children}

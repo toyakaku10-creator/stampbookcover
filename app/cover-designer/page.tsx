@@ -1256,7 +1256,7 @@ export default function CoverDesignerPage() {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Left panel */}
-        <div style={{ width: 200, minWidth: 200, maxWidth: 200, background: 'var(--surface)', borderRight: '1px solid var(--border)', overflowY: 'scroll', overflowX: 'hidden', flexShrink: 0 }}>
+        <div style={{ width: 200, minWidth: 200, maxWidth: 200, background: 'var(--surface)', borderRight: '1px solid var(--border)', overflowY: 'auto', overflowX: 'hidden', scrollbarGutter: 'stable', flexShrink: 0 }}>
 
           {/* 1. 背景色 — 常時表示 */}
           <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)' }}>
@@ -1504,7 +1504,7 @@ export default function CoverDesignerPage() {
         </div>
 
         {/* Right panel — プロパティ */}
-        <div style={{ width: 176, background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ width: 176, background: 'var(--surface)', borderLeft: '1px solid var(--border)', overflowY: 'auto', scrollbarGutter: 'stable', flexShrink: 0 }}>
           {!hasSelection ? (
             <div style={{ padding: 16, fontSize: 11, color: '#555', textAlign: 'center', marginTop: 24 }}>
               オブジェクトを<br />選択してください

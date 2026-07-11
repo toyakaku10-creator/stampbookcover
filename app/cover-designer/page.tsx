@@ -1022,14 +1022,14 @@ export default function CoverDesignerPage() {
           {currentTotalW}×{currentTotalH}mm
         </button>
         <span style={{ color: 'var(--border)' }}>|</span>
-        <button onClick={undo} disabled={!canUndo} title="元に戻す (Ctrl+Z)"
-          style={{ ...S.iconBtn(), opacity: canUndo ? 1 : 0.35, cursor: canUndo ? 'pointer' : 'default' }}>
-          <Undo2 size={15} />
-        </button>
         <button onClick={() => { const next = !snapOn; setSnapOn(next); snapOnRef.current = next; }}
           title={snapOn ? 'スナップON' : 'スナップOFF'}
           style={S.iconBtn(snapOn)}>
           <Magnet size={15} />
+        </button>
+        <button onClick={undo} disabled={!canUndo} title="元に戻す (Ctrl+Z)"
+          style={{ ...S.iconBtn(), opacity: canUndo ? 1 : 0.35, cursor: canUndo ? 'pointer' : 'default' }}>
+          <Undo2 size={15} />
         </button>
         <div style={{ width: 1, height: 16, background: '#2A4570' }} />
         <button

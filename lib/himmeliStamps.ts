@@ -80,29 +80,6 @@ const STAMP_DEFS: Array<{
       });
     },
   },
-  {
-    id: 'himmeli-sample-5',
-    name: '三連菱形',
-    build(fabric, fc) {
-      const base = parsePoints('0,-65 19,-32 0,0 -19,-32');
-      [0, 120, 240].forEach(deg => {
-        fc.add(new fabric.Polygon(shift(rotate(base, deg), CX, CY), opts));
-      });
-    },
-  },
-  {
-    id: 'himmeli-sample-6',
-    name: '六連＋中心円',
-    build(fabric, fc) {
-      const base = parsePoints('0,-58 17,-29 0,0 -17,-29');
-      [0, 60, 120, 180, 240, 300].forEach(deg => {
-        fc.add(new fabric.Polygon(shift(rotate(base, deg), CX, CY), opts));
-      });
-      fc.add(new fabric.Circle({
-        ...opts, left: CX, top: CY, radius: 10, originX: 'center', originY: 'center',
-      }));
-    },
-  },
 ];
 
 export async function ensureHimmeliStamps(): Promise<void> {

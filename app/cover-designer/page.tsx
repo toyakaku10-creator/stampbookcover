@@ -454,7 +454,6 @@ export default function CoverDesignerPage() {
       };
 
       canvas.on('mouse:down', (opt: any) => {
-        console.log('mouse:down handler A 実行');
         if (!isAreaSelectingRef.current) return;
         const p = getPt(opt);
         dragStartRef.current = { x: p.x, y: p.y };
@@ -480,8 +479,6 @@ export default function CoverDesignerPage() {
         areaRectRef.current = rect;
         canvas.add(rect);
         canvas.bringObjectToFront(rect);
-        ;(rect as any)._debugId = 'AREA_RECT_' + Date.now();
-        console.log('点線を追加したcanvasと fabricRef.current が同一か:', canvas === fabricRef.current);
       });
 
       canvas.on('mouse:move', (opt: any) => {
@@ -512,7 +509,6 @@ export default function CoverDesignerPage() {
         const width = Math.abs(p.x - dragStartRef.current.x);
         const height = Math.abs(p.y - dragStartRef.current.y);
         if (areaRectRef.current) {
-          console.log('set直前 left/top/width/height:', left, top, width, height);
           areaRectRef.current.set({ left, top, width, height });
           canvas.renderAll();
         }
@@ -764,26 +760,19 @@ export default function CoverDesignerPage() {
   }, [selectedStamps, stamps, arrangement, arrangementCount, stampSize, cols, rows, areaMode, customArea, beginBatch, endBatch]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('handleImageUpload called', e.target.files);
     const file = e.target.files?.[0];
-    if (!file) { console.log('no file selected'); return; }
-    console.log('file:', file.name, file.type, file.size);
-    if (!fabricRef.current) { console.log('no canvas'); return; }
+    if (!file) return;
+    if (!fabricRef.current) return;
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabric = canvas._fabric;
-    console.log('fabric:', !!fabric, 'FabricImage:', !!fabric?.FabricImage, 'Image:', !!fabric?.Image);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ImageClass = fabric.FabricImage ?? fabric.Image;
     const reader = new FileReader();
     reader.onload = async (ev) => {
-      console.log('FileReader onload fired');
       const dataUrl = ev.target?.result as string;
-      console.log('dataUrl length:', dataUrl?.length);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ImageClass = fabric.FabricImage ?? fabric.Image;
-      console.log('ImageClass:', !!ImageClass);
       try {
         const img = await ImageClass.fromURL(dataUrl, { crossOrigin: 'anonymous' });
-        console.log('FabricImage loaded', img.width, img.height);
         const cw = canvas.width as number;
         const ch = canvas.height as number;
         const scale = Math.min(cw / (img.width ?? 1), ch / (img.height ?? 1));
@@ -792,7 +781,6 @@ export default function CoverDesignerPage() {
         canvas.sendObjectToBack ? canvas.sendObjectToBack(img) : canvas.sendToBack(img);
         canvas.renderAll();
         requestAnimationFrame(() => { canvas.renderAll(); });
-        console.log('image placed on canvas');
       } catch (err) {
         console.error('FabricImage.fromURL error:', err);
       }
@@ -943,21 +931,8 @@ export default function CoverDesignerPage() {
     const img = new Image();
     img.onload = () => {
       const imgW = img.width, imgH = img.height;
-      console.log('preview canvas:', pc.width, pc.height);
-      console.log('img size:', imgW, imgH);
-      console.log('devicePixelRatio:', window.devicePixelRatio);
 
       const flapH = (currentTotalW - BOOK_W * 2 - SPINE_W) / 2;
-      // デバッグ：背表紙の切り出し位置確認
-      console.log('imgW:', imgW, 'imgH:', imgH);
-      console.log('currentTotalW:', currentTotalW, 'currentTotalH:', currentTotalH);
-      console.log('flapH:', flapH);
-      {
-        const _spineStart = Math.round(imgW * (flapH + BOOK_W) / currentTotalW);
-        const _spineW = Math.round(imgW * SPINE_W / currentTotalW);
-        console.log('spineStartPx:', _spineStart, 'spineWidthPx:', _spineW, '/ imgW:', imgW);
-        console.log('背表紙の切り出し範囲:', _spineStart, '〜', _spineStart + _spineW, '/', imgW);
-      }
       const flapV = (currentTotalH - BOOK_H) / 2;
       const bodyStartXmm = flapH;
       const bodyStartYmm = Math.max(0, flapV);
@@ -988,12 +963,6 @@ export default function CoverDesignerPage() {
       const spineLeft = 90;
       const spineRight = spineLeft + previewSpineW;
 
-      console.log('=== 背表紙の比率チェック ===');
-      console.log('切り出し元: 幅', spineWidthPx, 'px × 高さ', bookHeightPxY, 'px');
-      console.log('切り出し元の比率:', (spineWidthPx / bookHeightPxY).toFixed(4));
-      console.log('描画先: 幅', previewSpineW, 'px × 高さ 268px');
-      console.log('描画先の比率:', (previewSpineW / 268).toFixed(4));
-      console.log('理論値(SPINE_W/BOOK_H):', (SPINE_W / BOOK_H).toFixed(4));
 
       ctx.clearRect(0, 0, pc.width, pc.height);
       ctx.fillStyle = '#E8E8E8';
@@ -1051,7 +1020,7 @@ export default function CoverDesignerPage() {
       const displayHeightExtra = 260 * (ZOOM_FIX - 1);
       const dyFixed = 80 - displayHeightExtra / 2;
       const dhFixed = 260 + displayHeightExtra;
-      console.log('ZOOM_FIX(理論値):', ZOOM_FIX.toFixed(3), 'dyFixed:', dyFixed.toFixed(1), 'dhFixed:', dhFixed.toFixed(1));
+
 
       // 背表紙：外側クリップ確定 → 下地（保険）→ 画像（すべて同じパス基準・同一save内）
       // 底辺はlineTo（直線）：シアー変換後の画像底辺も対角直線のため、Bezierにすると隙間が生じる
@@ -1075,9 +1044,6 @@ export default function CoverDesignerPage() {
       ctx.rect(-leftExt, 80 - SHEAR_COMPENSATE, previewSpineW + leftExt, dh);
       ctx.clip();
       ctx.scale(-1, 1);
-      alert('背表紙 横スケール: ' + (previewSpineW / sw).toFixed(4) +
-        ' / 縦スケール: ' + (dh / sh).toFixed(4) +
-        ' / 一致度: ' + ((previewSpineW / sw) / (dh / sh)).toFixed(4));
       ctx.drawImage(
         img,
         sx, bookStartPxY,
@@ -1125,18 +1091,9 @@ export default function CoverDesignerPage() {
       // 背表紙の切り出しが表紙側に食い込んだ分を削る
       const spineOverlap = (sw - spineWidthPx) / 2 + OFFSET;
       const frontWidthPxAdjusted = frontWidthPx - spineOverlap;
-      console.log('=== 切り出し範囲 ===');
-      console.log('表紙 x:', frontStartPx, '〜', frontStartPx + frontWidthPxAdjusted);
-      console.log('背表紙 sx:', sx, '〜', sx + sw);
-      console.log('この2つが連続しているべき（表紙の右端 ≒ 背表紙の左端）');
-      console.log('表紙 y:', bookStartPxY, '〜', bookStartPxY + bookHeightPxY);
-      console.log('背表紙 sy:（表紙と同じはず）', bookStartPxY, '〜', bookStartPxY + bookHeightPxY);
       ctx.save();
       ctx.scale(-1, 1);
       const dispFrontWExact = Math.round(frontWidthPxAdjusted * 260 / bookHeightPxY);
-      alert('横スケール: ' + (dispFrontWExact / frontWidthPxAdjusted).toFixed(4) +
-        ' / 縦スケール: ' + (260 / bookHeightPxY).toFixed(4) +
-        ' / 一致度: ' + ((dispFrontWExact / frontWidthPxAdjusted) / (260 / bookHeightPxY)).toFixed(4));
       ctx.drawImage(img, frontStartPx, bookStartPxY, frontWidthPxAdjusted, bookHeightPxY,
         -(spineRight + dispFrontWExact), 70, dispFrontWExact, 260);
       ctx.restore();

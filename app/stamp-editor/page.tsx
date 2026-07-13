@@ -1007,10 +1007,18 @@ export default function StampEditorPage() {
         const data = JSON.parse(event.target?.result as string);
         if (data.stamps && Array.isArray(data.stamps)) {
           const current = getStamps();
-          const existingIds = new Set(current.map((s: Stamp) => s.id));
-          const toAdd = (data.stamps as Stamp[]).filter(s => !existingIds.has(s.id));
+          const existingIds   = new Set(current.map((s: Stamp) => s.id));
+          const existingNames = new Set(current.map((s: Stamp) => s.name));
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const toAdd = (data.stamps as any[]).filter(s => !existingIds.has(s.id) && !existingNames.has(s.name));
+          const skipped = data.stamps.length - toAdd.length;
+          if (toAdd.length === 0) {
+            alert('すべてのスタンプが既に登録されています（追加なし）');
+            return;
+          }
           toAdd.forEach((s: Stamp) => saveStamp(s));
           setStamps(getStamps());
+          alert(`${toAdd.length}個のスタンプを追加しました${skipped > 0 ? `（${skipped}個は重複のためスキップ）` : ''}`);
         }
       } catch {
         alert('ファイルの読み込みに失敗しました');

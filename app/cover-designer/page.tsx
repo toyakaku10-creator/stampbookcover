@@ -207,6 +207,8 @@ export default function CoverDesignerPage() {
   const [selOpacity, setSelOpacity] = useState(1);
   const [selAngle, setSelAngle] = useState(0);
   const [selSize, setSelSize] = useState(60);
+  const [isRect, setIsRect] = useState(false);
+  const [selRx, setSelRx] = useState(0);
 
   // 行列数直接指定
   const [cols, setCols] = useState(3);
@@ -310,12 +312,14 @@ export default function CoverDesignerPage() {
     if (!obj) { setHasSelection(false); setIsStamp(false); return; }
     setHasSelection(true);
     setIsStamp(obj.type === 'group');
+    setIsRect(obj.type === 'rect');
     setSelFill(typeof obj.fill === 'string' && obj.fill ? obj.fill : '#000000');
     setSelStroke(typeof obj.stroke === 'string' && obj.stroke ? obj.stroke : '#000000');
     setSelStrokeW(obj.strokeWidth ?? 1);
     setSelOpacity(obj.opacity ?? 1);
     setSelAngle(Math.round(obj.angle ?? 0));
     setSelSize(Math.round(Math.max(obj.getScaledWidth?.() ?? 0, obj.getScaledHeight?.() ?? 0)));
+    setSelRx(Math.round(obj.rx ?? 0));
   }, []);
 
   const updateSelPropsRef = useRef(updateSelProps);
@@ -1542,6 +1546,27 @@ export default function CoverDesignerPage() {
                     <button onClick={() => { const v = selStrokeW + 1; setSelStrokeW(v); applySelProp({ strokeWidth: v }); }}
                       style={S.iconBtn()}><Plus size={12} /></button>
                   </div>
+
+                  {isRect && (
+                    <>
+                      <div style={S.sectionTitle}>角の丸み</div>
+                      <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <button onClick={() => {
+                          const v = Math.max(0, selRx - 2);
+                          setSelRx(v);
+                          applySelProp({ rx: v, ry: v });
+                          saveHistoryRef.current();
+                        }} style={S.iconBtn()}><Minus size={12} /></button>
+                        <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{selRx}</span>
+                        <button onClick={() => {
+                          const v = selRx + 2;
+                          setSelRx(v);
+                          applySelProp({ rx: v, ry: v });
+                          saveHistoryRef.current();
+                        }} style={S.iconBtn()}><Plus size={12} /></button>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 

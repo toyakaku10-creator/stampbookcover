@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  MousePointer2, Minus, Square, Circle, Triangle,
+  MousePointer2, Minus, Plus, Square, Circle, Triangle,
   Type, Bold, Italic, Underline, AlignLeft,
   Trash2, Save, X, Undo2, XCircle,
   Copy, BringToFront, SendToBack, Magnet, RotateCw, RotateCcw,
@@ -191,6 +191,7 @@ export default function StampEditorPage() {
   const [snapEnabled, setSnapEnabled] = useState(true);
   // 直線端点編集
   const [lineCoords, setLineCoords] = useState<{ ax1: number; ay1: number; ax2: number; ay2: number } | null>(null);
+  const [selRx, setSelRx] = useState(0);
   // カスタム形状の種類
   const [selectedShapeType, setSelectedShapeType] = useState<'trapezoid' | 'arc' | 'dot' | null>(null);
   // 台形プロパティ
@@ -231,7 +232,7 @@ export default function StampEditorPage() {
   // ── 選択オブジェクトからパネルへ同期 ─────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const syncFromObj = useCallback((obj: any) => {
-    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); return; }
+    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); return; }
     const props = getEffectiveProps(obj);
     isApplyingFromSelRef.current = true;
     setColor(props.stroke);
@@ -240,6 +241,7 @@ export default function StampEditorPage() {
     setCurrentAngle(Math.round(obj.angle ?? 0));
     setHasSelection(true);
     setSelectedObjType(obj.type ?? '');
+    setSelRx(obj.type === 'rect' ? Math.round(obj.rx ?? 0) : 0);
     if (obj.type === 'line') {
       const coords = getLineAbsCoords(obj);
       setLineCoords(coords);
@@ -1191,6 +1193,36 @@ export default function StampEditorPage() {
                   </button>
                 </div>
               </div>
+
+              {/* 角の丸み（矩形選択時のみ） */}
+              {selectedObjType === 'rect' && (
+                <div>
+                  <div style={S.label}>角の丸み</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button onClick={() => {
+                      const canvas = fabricRef.current;
+                      const obj = canvas?.getActiveObject();
+                      if (!canvas || !obj) return;
+                      const v = Math.max(0, selRx - 2);
+                      setSelRx(v);
+                      obj.set({ rx: v, ry: v });
+                      canvas.renderAll();
+                      saveHistoryRef.current();
+                    }} style={S.actionBtn()}><Minus size={12} /></button>
+                    <span style={{ flex: 1, textAlign: 'center', fontSize: 12, color: 'var(--text)' }}>{selRx}</span>
+                    <button onClick={() => {
+                      const canvas = fabricRef.current;
+                      const obj = canvas?.getActiveObject();
+                      if (!canvas || !obj) return;
+                      const v = selRx + 2;
+                      setSelRx(v);
+                      obj.set({ rx: v, ry: v });
+                      canvas.renderAll();
+                      saveHistoryRef.current();
+                    }} style={S.actionBtn()}><Plus size={12} /></button>
+                  </div>
+                </div>
+              )}
 
               {/* 直線端点編集（直線選択時のみ） */}
               {selectedObjType === 'line' && lineCoords !== null && (

@@ -968,6 +968,8 @@ export default function CoverDesignerPage() {
       const spineWidthPx  = Math.round(imgW * SPINE_W / currentTotalW);
       const bookStartPxY  = Math.round(imgH * bodyStartYmm / currentTotalH);
       const bookHeightPxY = Math.round(imgH * Math.min(BOOK_H, currentTotalH) / currentTotalH);
+      // 縦横比を保った表紙の表示幅（HEIGHT=260を縦の基準にして横を合わせる）
+      const dispFrontW = Math.round(frontWidthPx * 260 / bookHeightPxY);
 
       // デバッグ：縦横比確認（previewSpineWはこの後に定義されるため後ろで出力）
 
@@ -1008,9 +1010,9 @@ export default function CoverDesignerPage() {
       // 背表紙側の辺：外側に膨らむ曲線
       ctx.quadraticCurveTo(spineLeft + 8, 62, spineRight, 70);
       // 下辺（手前）
-      ctx.lineTo(spineRight + 200, 70);
+      ctx.lineTo(spineRight + dispFrontW, 70);
       // 小口側の辺：外側に膨らむ曲線で上辺へ
-      ctx.quadraticCurveTo(spineRight + 200 - 8, 62, spineRight + 200 - 30, 55);
+      ctx.quadraticCurveTo(spineRight + dispFrontW - 8, 62, spineRight + dispFrontW - 30, 55);
       // 上辺（奥）
       ctx.closePath();
       ctx.fillStyle = '#F0EAE0';
@@ -1024,7 +1026,7 @@ export default function CoverDesignerPage() {
         const lx = spineLeft + (spineRight - spineLeft) * t + 8 * t * (1 - t) * 2;
         const ly = 55 + 15 * t;
         // 小口側の曲線を補間
-        const rx = (spineRight + 200 - 30) + 30 * t - 8 * t * (1 - t) * 2;
+        const rx = (spineRight + dispFrontW - 30) + 30 * t - 8 * t * (1 - t) * 2;
         ctx.strokeStyle = i % 4 === 0 ? 'rgba(160,153,143,0.6)' : 'rgba(190,185,178,0.35)';
         ctx.lineWidth = 0.5;
         ctx.beginPath();
@@ -1038,7 +1040,7 @@ export default function CoverDesignerPage() {
       ctx.stroke();
 
       // 背表紙：描画パラメータ（clipより先に計算）
-      const frontScale = 200 / frontWidthPx;
+      const frontScale = 260 / bookHeightPxY;
       const correctSpineDisplayW = spineWidthPx * frontScale;
       const ZOOM_FIX = previewSpineW / correctSpineDisplayW;
       const sw = spineWidthPx * ZOOM_FIX;
@@ -1111,10 +1113,10 @@ export default function CoverDesignerPage() {
 
       // 表紙：白塗り + 縁取り
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(spineRight, 70, 200, 260);
+      ctx.fillRect(spineRight, 70, dispFrontW, 260);
       ctx.strokeStyle = '#C0B8A8';
       ctx.lineWidth = 0.8;
-      ctx.strokeRect(spineRight, 70, 200, 260);
+      ctx.strokeRect(spineRight, 70, dispFrontW, 260);
 
       // 表紙：画像（鏡文字打ち消し）
       // 背表紙の切り出しが表紙側に食い込んだ分を削る
@@ -1128,11 +1130,12 @@ export default function CoverDesignerPage() {
       console.log('背表紙 sy:（表紙と同じはず）', bookStartPxY, '〜', bookStartPxY + bookHeightPxY);
       ctx.save();
       ctx.scale(-1, 1);
-      alert('横スケール: ' + (200 / frontWidthPxAdjusted).toFixed(4) +
+      const dispFrontWExact = Math.round(frontWidthPxAdjusted * 260 / bookHeightPxY);
+      alert('横スケール: ' + (dispFrontWExact / frontWidthPxAdjusted).toFixed(4) +
         ' / 縦スケール: ' + (260 / bookHeightPxY).toFixed(4) +
-        ' / 一致度: ' + ((200 / frontWidthPxAdjusted) / (260 / bookHeightPxY)).toFixed(4));
+        ' / 一致度: ' + ((dispFrontWExact / frontWidthPxAdjusted) / (260 / bookHeightPxY)).toFixed(4));
       ctx.drawImage(img, frontStartPx, bookStartPxY, frontWidthPxAdjusted, bookHeightPxY,
-        -(spineRight + 200), 70, 200, 260);
+        -(spineRight + dispFrontWExact), 70, dispFrontWExact, 260);
       ctx.restore();
 
       ctx.restore();

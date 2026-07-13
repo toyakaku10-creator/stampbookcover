@@ -226,6 +226,7 @@ export default function CoverDesignerPage() {
   const isAreaSelectingRef = useRef(false); // Fabricイベントハンドラ内で参照するRef
   const lineStartRef = useRef<{ x: number; y: number } | null>(null);
   const previewLineRef = useRef<any>(null);
+  const angleTextRef = useRef<any>(null);
 
   const setTool = (tool: string) => {
     setActiveTool(tool);
@@ -489,6 +490,18 @@ export default function CoverDesignerPage() {
           const p = opt.scenePoint ?? opt.pointer;
           if (p) {
             previewLineRef.current.set({ x2: p.x, y2: p.y });
+            const start = lineStartRef.current;
+            const dx = p.x - start.x;
+            const dy = p.y - start.y;
+            let angle = Math.atan2(-dy, dx) * (180 / Math.PI);
+            if (angle < 0) angle += 360;
+            if (!angleTextRef.current) {
+              angleTextRef.current = new fabric.Text('', {
+                fontSize: 12, fill: '#C9A84C', selectable: false, evented: false,
+              });
+              canvas.add(angleTextRef.current);
+            }
+            angleTextRef.current.set({ text: `${Math.round(angle)}°`, left: p.x + 10, top: p.y - 20 });
             canvas.renderAll();
           }
         }
@@ -571,6 +584,7 @@ export default function CoverDesignerPage() {
             // 2回目：終点を確定して本番直線を配置
             const start = lineStartRef.current;
             if (previewLineRef.current) canvas.remove(previewLineRef.current);
+            if (angleTextRef.current) { canvas.remove(angleTextRef.current); angleTextRef.current = null; }
             const strokeColor = canvas.drawColor ?? '#C9A84C';
             const sw = canvas.strokeW ?? 1.5;
             const line = new fabric.Line([start.x, start.y, x, y], {

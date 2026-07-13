@@ -1075,6 +1075,9 @@ export default function CoverDesignerPage() {
       ctx.rect(-leftExt, 80 - SHEAR_COMPENSATE, previewSpineW + leftExt, dh);
       ctx.clip();
       ctx.scale(-1, 1);
+      alert('背表紙 横スケール: ' + (previewSpineW / sw).toFixed(4) +
+        ' / 縦スケール: ' + (dh / sh).toFixed(4) +
+        ' / 一致度: ' + ((previewSpineW / sw) / (dh / sh)).toFixed(4));
       ctx.drawImage(
         img,
         sx, bookStartPxY,

@@ -1128,6 +1128,10 @@ export default function CoverDesignerPage() {
       console.log('背表紙 sy:（表紙と同じはず）', bookStartPxY, '〜', bookStartPxY + bookHeightPxY);
       ctx.save();
       ctx.scale(-1, 1);
+      console.log('=== 表紙の縮小率 ===');
+      console.log('横スケール:', (200 / frontWidthPxAdjusted).toFixed(4));
+      console.log('縦スケール:', (260 / bookHeightPxY).toFixed(4));
+      console.log('縦横比の一致度（1.0が理想）:', ((200 / frontWidthPxAdjusted) / (260 / bookHeightPxY)).toFixed(4));
       ctx.drawImage(img, frontStartPx, bookStartPxY, frontWidthPxAdjusted, bookHeightPxY,
         -(spineRight + 200), 70, 200, 260);
       ctx.restore();

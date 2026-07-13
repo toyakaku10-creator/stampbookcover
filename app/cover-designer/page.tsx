@@ -65,7 +65,7 @@ const INIT_SCALE = 0.07;
 const DISP_W = Math.round(INIT_W_PX * INIT_SCALE);
 const DISP_H = Math.round(INIT_H_PX * INIT_SCALE);
 const SNAP_GRID = 10;
-const BOOK_W = 142, BOOK_H = 152, SPINE_W = 15;
+const BOOK_W = 105, BOOK_H = 148, SPINE_W = 15;
 
 type ArrangementType = 'grid' | 'stagger' | 'frame' | 'wave';
 

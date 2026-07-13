@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { Stamp as StampType, Tool } from '@/lib/types';
 import { getStamps } from '@/lib/stampStorage';
-import { buildObjectAt } from '@/lib/shapePlacement';
+import { buildObjectAt, roundedPolygonPath } from '@/lib/shapePlacement';
 
 const COVER_PRESETS = [
   { name: '応募サイズ', w: 385, h: 152, locked: true },
@@ -209,6 +209,8 @@ export default function CoverDesignerPage() {
   const [selSize, setSelSize] = useState(60);
   const [isRect, setIsRect] = useState(false);
   const [selRx, setSelRx] = useState(0);
+  const [isTrapezoid, setIsTrapezoid] = useState(false);
+  const [selTrapRx, setSelTrapRx] = useState(0);
 
   // 行列数直接指定
   const [cols, setCols] = useState(3);
@@ -313,6 +315,7 @@ export default function CoverDesignerPage() {
     setHasSelection(true);
     setIsStamp(obj.type === 'group');
     setIsRect(obj.type === 'rect');
+    setIsTrapezoid(obj._shapeType === 'trapezoid');
     setSelFill(typeof obj.fill === 'string' && obj.fill ? obj.fill : '#000000');
     setSelStroke(typeof obj.stroke === 'string' && obj.stroke ? obj.stroke : '#000000');
     setSelStrokeW(obj.strokeWidth ?? 1);
@@ -320,6 +323,7 @@ export default function CoverDesignerPage() {
     setSelAngle(Math.round(obj.angle ?? 0));
     setSelSize(Math.round(Math.max(obj.getScaledWidth?.() ?? 0, obj.getScaledHeight?.() ?? 0)));
     setSelRx(Math.round(obj.rx ?? 0));
+    setSelTrapRx(obj._shapeType === 'trapezoid' ? Math.round(obj._trapRadius ?? 0) : 0);
   }, []);
 
   const updateSelPropsRef = useRef(updateSelProps);
@@ -911,6 +915,51 @@ export default function CoverDesignerPage() {
     }
     setExpandedSection(s => s === 'shape' ? '' : 'shape');
   };
+
+  // ── 台形 角の丸み ──────────────────────────────────────────────────
+  const applyTrapezoidRadius = useCallback(async (radius: number) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const old: any = canvas?.getActiveObject();
+    if (!canvas || !old || old._shapeType !== 'trapezoid') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod: any = await import('fabric');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = mod.fabric ?? mod.default ?? mod;
+    const topW = old._trapTop ?? 60;
+    const botW = old._trapBottom ?? 90;
+    const h    = old._trapHeight ?? 50;
+    const half = (botW - topW) / 2;
+    const points: { x: number; y: number }[] = old._trapPoints ?? [
+      { x: half, y: 0 }, { x: half + topW, y: 0 }, { x: botW, y: h }, { x: 0, y: h },
+    ];
+    const pathStr = roundedPolygonPath(points, radius);
+    const newPath = new fabric.Path(pathStr, {
+      left: old.left, top: old.top, angle: old.angle,
+      scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
+      stroke: old.stroke, strokeWidth: old.strokeWidth,
+      fill: old.fill, strokeUniform: true,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._shapeType = 'trapezoid';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._trapTop    = topW;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._trapBottom = botW;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._trapHeight = h;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._trapPoints = points;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._trapRadius = radius;
+    canvas.remove(old);
+    canvas.add(newPath);
+    canvas.setActiveObject(newPath);
+    canvas.renderAll();
+    setSelTrapRx(radius);
+    setIsTrapezoid(true);
+    saveHistoryRef.current();
+  }, []);
 
   // ── プレビュー ────────────────────────────────────────────────────
   const openPreview = useCallback(() => {
@@ -1564,6 +1613,19 @@ export default function CoverDesignerPage() {
                           applySelProp({ rx: v, ry: v });
                           saveHistoryRef.current();
                         }} style={S.iconBtn()}><Plus size={12} /></button>
+                      </div>
+                    </>
+                  )}
+
+                  {isTrapezoid && (
+                    <>
+                      <div style={S.sectionTitle}>角の丸み</div>
+                      <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <button onClick={() => applyTrapezoidRadius(Math.max(0, selTrapRx - 2))}
+                          style={S.iconBtn()}><Minus size={12} /></button>
+                        <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{selTrapRx}</span>
+                        <button onClick={() => applyTrapezoidRadius(selTrapRx + 2)}
+                          style={S.iconBtn()}><Plus size={12} /></button>
                       </div>
                     </>
                   )}

@@ -5,6 +5,35 @@ import type { Tool } from './types';
 
 const GOLD = '#C9A84C';
 
+// ── 角丸ポリゴンパス生成 ────────────────────────────────────
+export function roundedPolygonPath(points: { x: number; y: number }[], radius: number): string {
+  if (radius <= 0) {
+    return 'M' + points.map(p => `${p.x},${p.y}`).join('L') + 'Z';
+  }
+  const n = points.length;
+  let path = '';
+  for (let i = 0; i < n; i++) {
+    const curr = points[i];
+    const prev = points[(i - 1 + n) % n];
+    const next = points[(i + 1) % n];
+    const toPrev = { x: prev.x - curr.x, y: prev.y - curr.y };
+    const toNext = { x: next.x - curr.x, y: next.y - curr.y };
+    const lenPrev = Math.sqrt(toPrev.x ** 2 + toPrev.y ** 2);
+    const lenNext = Math.sqrt(toNext.x ** 2 + toNext.y ** 2);
+    const r = Math.min(radius, lenPrev / 2, lenNext / 2);
+    const p1 = { x: curr.x + (toPrev.x / lenPrev) * r, y: curr.y + (toPrev.y / lenPrev) * r };
+    const p2 = { x: curr.x + (toNext.x / lenNext) * r, y: curr.y + (toNext.y / lenNext) * r };
+    if (i === 0) {
+      path += `M${p1.x},${p1.y}`;
+    } else {
+      path += `L${p1.x},${p1.y}`;
+    }
+    path += `Q${curr.x},${curr.y} ${p2.x},${p2.y}`;
+  }
+  path += 'Z';
+  return path;
+}
+
 // ── 円弧パス生成ヘルパー ────────────────────────────────────
 export function buildArcPath(r: number, startDeg: number, endDeg: number): string {
   const s = (startDeg * Math.PI) / 180;
@@ -83,6 +112,10 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
     (poly as any)._trapBottom = botW;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (poly as any)._trapHeight = h;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (poly as any)._trapPoints = [{ x: half, y: 0 }, { x: half + topW, y: 0 }, { x: botW, y: h }, { x: 0, y: h }];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (poly as any)._trapRadius = 0;
     return poly;
   }
   if (toolId === 'arc') {

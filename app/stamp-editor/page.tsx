@@ -10,7 +10,7 @@ import {
 import { Tool } from '@/lib/types';
 import { saveStamp, getStamps, deleteStamp, renameStamp } from '@/lib/stampStorage';
 import type { Stamp } from '@/lib/types';
-import { buildArcPath, buildObjectAt } from '@/lib/shapePlacement';
+import { buildArcPath, buildObjectAt, roundedPolygonPath } from '@/lib/shapePlacement';
 import AppHeader from '@/components/AppHeader';
 import { ensureHimmeliStamps } from '@/lib/himmeliStamps';
 
@@ -192,6 +192,7 @@ export default function StampEditorPage() {
   // 直線端点編集
   const [lineCoords, setLineCoords] = useState<{ ax1: number; ay1: number; ax2: number; ay2: number } | null>(null);
   const [selRx, setSelRx] = useState(0);
+  const [selTrapRx, setSelTrapRx] = useState(0);
   // カスタム形状の種類
   const [selectedShapeType, setSelectedShapeType] = useState<'trapezoid' | 'arc' | 'dot' | null>(null);
   // 台形プロパティ
@@ -232,7 +233,7 @@ export default function StampEditorPage() {
   // ── 選択オブジェクトからパネルへ同期 ─────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const syncFromObj = useCallback((obj: any) => {
-    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); return; }
+    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); return; }
     const props = getEffectiveProps(obj);
     isApplyingFromSelRef.current = true;
     setColor(props.stroke);
@@ -255,6 +256,7 @@ export default function StampEditorPage() {
       setTrapTop(obj._trapTop ?? 60);
       setTrapBottom(obj._trapBottom ?? 90);
       setTrapHeight(obj._trapHeight ?? 50);
+      setSelTrapRx(obj._trapRadius ?? 0);
     } else if (st === 'arc') {
       setSelectedShapeType('arc');
       setArcRadius(obj._arcRadius ?? 45);
@@ -744,7 +746,42 @@ export default function StampEditorPage() {
     (poly as any)._trapTop = topW;
     (poly as any)._trapBottom = botW;
     (poly as any)._trapHeight = h;
+    (poly as any)._trapPoints = [{ x: half, y: 0 }, { x: half + topW, y: 0 }, { x: botW, y: h }, { x: 0, y: h }];
+    (poly as any)._trapRadius = 0;
+    setSelTrapRx(0);
     replaceShape(poly);
+  }, [replaceShape]);
+
+  const applyTrapezoidRadius = useCallback((radius: number) => {
+    const canvas = fabricRef.current;
+    const old = canvas?.getActiveObject() ?? lastActiveRef.current;
+    if (!canvas || !old || (old as any)._shapeType !== 'trapezoid') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric = (canvas as any)._fabric;
+    if (!fabric) return;
+    const topW = (old as any)._trapTop ?? 60;
+    const botW = (old as any)._trapBottom ?? 90;
+    const h    = (old as any)._trapHeight ?? 50;
+    const half = (botW - topW) / 2;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const points: { x: number; y: number }[] = (old as any)._trapPoints ?? [
+      { x: half, y: 0 }, { x: half + topW, y: 0 }, { x: botW, y: h }, { x: 0, y: h },
+    ];
+    const pathStr = roundedPolygonPath(points, radius);
+    const newPath = new fabric.Path(pathStr, {
+      left: old.left, top: old.top, angle: old.angle,
+      scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
+      stroke: old.stroke, strokeWidth: old.strokeWidth,
+      fill: old.fill, strokeUniform: true,
+    });
+    (newPath as any)._shapeType = 'trapezoid';
+    (newPath as any)._trapTop    = topW;
+    (newPath as any)._trapBottom = botW;
+    (newPath as any)._trapHeight = h;
+    (newPath as any)._trapPoints = points;
+    (newPath as any)._trapRadius = radius;
+    setSelTrapRx(radius);
+    replaceShape(newPath);
   }, [replaceShape]);
 
   const applyArcProps = useCallback((r: number, startDeg: number, endDeg: number) => {
@@ -1097,6 +1134,12 @@ export default function StampEditorPage() {
                     <span style={{ fontSize: 11, color: '#888' }}>px</span>
                   </div>
                 ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <span style={{ fontSize: 11, color: '#888', width: 26 }}>丸み</span>
+                  <button onClick={() => applyTrapezoidRadius(Math.max(0, selTrapRx - 2))} style={S.actionBtn()}><Minus size={12} /></button>
+                  <span style={{ flex: 1, textAlign: 'center', fontSize: 12, color: 'var(--text)' }}>{selTrapRx}</span>
+                  <button onClick={() => applyTrapezoidRadius(selTrapRx + 2)} style={S.actionBtn()}><Plus size={12} /></button>
+                </div>
               </div>
             </>
           )}

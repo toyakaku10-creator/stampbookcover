@@ -13,6 +13,7 @@ import type { Stamp } from '@/lib/types';
 import { buildArcPath, buildObjectAt } from '@/lib/shapePlacement';
 import AppHeader from '@/components/AppHeader';
 import { ensureHimmeliStamps } from '@/lib/himmeliStamps';
+import { ensureFikaStamps } from '@/lib/fikaStamps';
 
 const FONTS = ['Arial', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana', 'Impact'];
 const CANVAS_SIZE = 400;
@@ -205,7 +206,10 @@ export default function StampEditorPage() {
   const [dotRadius, setDotRadius] = useState(3);
 
   useEffect(() => {
-    ensureHimmeliStamps().then(() => setStamps(getStamps())).catch(console.error);
+    ensureHimmeliStamps()
+      .then(() => ensureFikaStamps())
+      .then(() => setStamps(getStamps()))
+      .catch(console.error);
   }, []);
 
   // toolRef を tool state と常に同期（canvas イベントハンドラが stale にならないよう）

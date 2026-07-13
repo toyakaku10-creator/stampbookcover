@@ -908,35 +908,6 @@ export default function CoverDesignerPage() {
     setExpandedSection(s => s === 'shape' ? '' : 'shape');
   };
 
-  // ── デバッグ：ガイド線 ──────────────────────────────────────────────
-  const addGuideLines = useCallback(async () => {
-    const canvas = fabricRef.current;
-    if (!canvas) return;
-    const mod: any = await import('fabric');
-    const fabric: any = mod.fabric ?? mod.default ?? mod;
-    const flapH = (currentTotalW - BOOK_W * 2 - SPINE_W) / 2;
-    const positions: Record<string, number> = {
-      leftFold: flapH,
-      frontSpineBoundary: flapH + BOOK_W,
-      spineBackBoundary: flapH + BOOK_W + SPINE_W,
-      rightFold: flapH + BOOK_W * 2 + SPINE_W,
-      spineCenter: flapH + BOOK_W + SPINE_W / 2,
-    };
-    Object.entries(positions).forEach(([key, mm]) => {
-      const xPx = mm / currentTotalW * canvas.getWidth();
-      const isCenter = key === 'spineCenter';
-      const line = new fabric.Line([xPx, 0, xPx, canvas.getHeight()], {
-        stroke: isCenter ? 'red' : 'rgba(0,150,255,0.5)',
-        strokeWidth: isCenter ? 1.5 : 1,
-        strokeDashArray: isCenter ? [4, 4] : [8, 4],
-        selectable: false,
-        evented: false,
-      });
-      canvas.add(line);
-    });
-    canvas.renderAll();
-  }, [currentTotalW]);
-
   // ── プレビュー ────────────────────────────────────────────────────
   const openPreview = useCallback(() => {
     if (!fabricRef.current) return;
@@ -1234,11 +1205,6 @@ export default function CoverDesignerPage() {
             onMouseEnter={e => { e.currentTarget.style.background = '#243F66'; }}
             onMouseLeave={e => { e.currentTarget.style.background = '#1A3358'; }}>
             <BookOpen size={14} /> プレビュー
-          </button>
-          <button onClick={addGuideLines} style={S.tbBtn()}
-            onMouseEnter={e => { e.currentTarget.style.background = '#243F66'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#1A3358'; }}>
-            ガイド線表示
           </button>
         </div>
 

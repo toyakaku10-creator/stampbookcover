@@ -6,6 +6,7 @@ import {
   Type, Bold, Italic, Underline, AlignLeft,
   Trash2, Save, X, Undo2, XCircle,
   Copy, BringToFront, SendToBack, Magnet, RotateCw, RotateCcw,
+  Pencil, Download, Upload,
 } from 'lucide-react';
 import { Tool } from '@/lib/types';
 import { saveStamp, getStamps, deleteStamp, renameStamp } from '@/lib/stampStorage';
@@ -189,6 +190,7 @@ export default function StampEditorPage() {
   const [editingName, setEditingName] = useState('');
   const [canUndo, setCanUndo]         = useState(false);
   const [snapEnabled, setSnapEnabled] = useState(true);
+  const [stampEditMode, setStampEditMode] = useState(false);
   // 直線端点編集
   const [lineCoords, setLineCoords] = useState<{ ax1: number; ay1: number; ax2: number; ay2: number } | null>(null);
   const [selRx, setSelRx] = useState(0);
@@ -985,6 +987,39 @@ export default function StampEditorPage() {
     setStamps(getStamps());
   }, []);
 
+  const exportStamps = useCallback(() => {
+    const data = { stamps, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `stamps-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [stamps]);
+
+  const importStamps = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.stamps && Array.isArray(data.stamps)) {
+          const current = getStamps();
+          const existingIds = new Set(current.map((s: Stamp) => s.id));
+          const toAdd = (data.stamps as Stamp[]).filter(s => !existingIds.has(s.id));
+          toAdd.forEach((s: Stamp) => saveStamp(s));
+          setStamps(getStamps());
+        }
+      } catch {
+        alert('ファイルの読み込みに失敗しました');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }, []);
+
   const isText = tool === 'text' || selectedObjType === 'i-text';
 
   return (
@@ -1337,8 +1372,23 @@ export default function StampEditorPage() {
           </button>
 
           <div style={{ height: 1, background: 'var(--border)' }} />
-          <div style={{ ...S.label, display: 'flex', justifyContent: 'space-between' }}>
-            <span>登録済み</span><span style={{ color: 'var(--accent)' }}>{stamps.length}</span>
+
+          <button onClick={exportStamps} style={{ ...S.btn(), fontSize: 11, padding: '5px 8px', gap: 4 }}>
+            <Download size={12} /> 書き出し
+          </button>
+          <label style={{ ...S.btn(), fontSize: 11, padding: '5px 8px', gap: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Upload size={12} /> 読み込み
+            <input type="file" accept=".json" onChange={importStamps} style={{ display: 'none' }} />
+          </label>
+
+          <div style={{ height: 1, background: 'var(--border)' }} />
+          <div style={{ ...S.label, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>登録済み <span style={{ color: 'var(--accent)' }}>{stamps.length}</span></span>
+            <button
+              onClick={() => setStampEditMode(v => !v)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: stampEditMode ? 'var(--accent)' : '#6B7A99', display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, padding: '2px 4px' }}>
+              <Pencil size={11} />{stampEditMode ? '完了' : '編集'}
+            </button>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1378,10 +1428,12 @@ export default function StampEditorPage() {
                   )}
                   <div style={{ fontSize: 10, color: '#888' }}>{new Date(stamp.createdAt).toLocaleDateString()}</div>
                 </div>
-                <button onClick={e => removeStamp(stamp.id, e)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 2 }}>
-                  <X size={12} />
-                </button>
+                {stampEditMode && (
+                  <button onClick={e => removeStamp(stamp.id, e)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 2, flexShrink: 0 }}>
+                    <X size={12} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

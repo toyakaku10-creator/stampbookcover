@@ -831,9 +831,18 @@ export default function CoverDesignerPage() {
   };
 
   const deleteSelected = () => {
-    if (!fabricRef.current) return;
-    const active = fabricRef.current.getActiveObject();
-    if (active) { fabricRef.current.remove(active); fabricRef.current.renderAll(); }
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject();
+    if (!active) return;
+    if (active.type === 'activeSelection') {
+      (active as any).getObjects().forEach((obj: any) => canvas.remove(obj));
+      canvas.discardActiveObject();
+    } else {
+      canvas.remove(active);
+    }
+    canvas.renderAll();
+    saveHistoryRef.current();
   };
 
   const clearAll = () => {

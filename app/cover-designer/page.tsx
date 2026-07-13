@@ -834,6 +834,7 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     if (!canvas) return;
     const active = canvas.getActiveObject();
+    alert('selected type: ' + active?.type + ', objects: ' + (active as any)?.getObjects?.()?.length);
     if (!active) return;
     if (active.type === 'activeSelection') {
       (active as any).getObjects().forEach((obj: any) => canvas.remove(obj));

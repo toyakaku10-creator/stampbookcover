@@ -855,15 +855,29 @@ export default function CoverDesignerPage() {
   };
 
   const duplicateSelected = async () => {
-    if (!fabricRef.current) return;
     const canvas = fabricRef.current;
+    if (!canvas) return;
     const active = canvas.getActiveObject();
     if (!active) return;
-    const cloned = await active.clone();
-    cloned.set({ left: active.left + 20, top: active.top + 20 });
-    canvas.add(cloned);
-    canvas.setActiveObject(cloned);
+
+    if (active.type === 'activeselection') {
+      const objs = (active as any).getObjects();
+      const clones: any[] = await Promise.all(objs.map((o: any) => o.clone()));
+      canvas.discardActiveObject();
+      clones.forEach(c => { c.set({ left: c.left + 20, top: c.top + 20 }); canvas.add(c); });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mod: any = await import('fabric');
+      const fabric: any = mod.fabric ?? mod.default ?? mod;
+      const sel = new fabric.ActiveSelection(clones, { canvas });
+      canvas.setActiveObject(sel);
+    } else {
+      const cloned = await active.clone();
+      cloned.set({ left: active.left + 20, top: active.top + 20 });
+      canvas.add(cloned);
+      canvas.setActiveObject(cloned);
+    }
     canvas.renderAll();
+    saveHistoryRef.current();
   };
 
   const applySize = useCallback((wMm: number, hMm: number) => {

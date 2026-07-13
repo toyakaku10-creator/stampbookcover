@@ -509,7 +509,7 @@ export default function StampEditorPage() {
         if (!snapEnabledRef.current) return;
         const others = canvas.getObjects().filter((o: any) => o !== moving && !o._isLineHandle);
         const movingPoints = getSnapPoints(moving);
-        let bestDist = SNAP_THRESHOLD * SNAP_THRESHOLD;
+        let bestDist = Infinity;
         let snapDx = 0;
         let snapDy = 0;
 

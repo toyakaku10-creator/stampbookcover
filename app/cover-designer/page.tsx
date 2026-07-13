@@ -416,7 +416,7 @@ export default function CoverDesignerPage() {
         const moving = e.target;
         const others = canvas.getObjects().filter((o: any) => o !== moving && !o.isOverlay);
         const movingPoints = getSnapPoints(moving);
-        let bestDist = SNAP_THRESHOLD * SNAP_THRESHOLD;
+        let bestDist = Infinity;
         let snapDx = 0, snapDy = 0;
 
         others.forEach((obj: any) => {

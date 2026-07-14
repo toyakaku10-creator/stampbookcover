@@ -197,6 +197,8 @@ export default function StampEditorPage() {
   const [selTrapRx, setSelTrapRx] = useState(0);
   const [rectSides, setRectSides] = useState({ top: true, right: true, bottom: true, left: true });
   const [showSideToggle, setShowSideToggle] = useState(false);
+  const [showTriSideToggle, setShowTriSideToggle] = useState(false);
+  const [triSides, setTriSides] = useState({ s0: true, s1: true, s2: true });
   // カスタム形状の種類
   const [selectedShapeType, setSelectedShapeType] = useState<'trapezoid' | 'arc' | 'dot' | 'h-diamond' | 'triangle' | null>(null);
   // 台形プロパティ
@@ -237,7 +239,7 @@ export default function StampEditorPage() {
   // ── 選択オブジェクトからパネルへ同期 ─────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const syncFromObj = useCallback((obj: any) => {
-    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); setRectSides({ top: true, right: true, bottom: true, left: true }); setShowSideToggle(false); return; }
+    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); setRectSides({ top: true, right: true, bottom: true, left: true }); setShowSideToggle(false); setShowTriSideToggle(false); setTriSides({ s0: true, s1: true, s2: true }); return; }
     const props = getEffectiveProps(obj);
     isApplyingFromSelRef.current = true;
     setColor(props.stroke);
@@ -249,6 +251,10 @@ export default function StampEditorPage() {
     const poly4 = obj.type === 'polygon' && (obj.points?.length ?? 0) === 4;
     setSelectedObjType(obj.type === 'rect' ? 'rect' : isRectSidesGroup ? 'rect-sides' : (obj.type ?? ''));
     setShowSideToggle(obj.type === 'rect' || isRectSidesGroup || poly4);
+    const isTriPoly = obj._shapeType === 'triangle' && obj.type === 'polygon';
+    const isTriSidesGroup = obj._shapeType === 'tri-sides';
+    setShowTriSideToggle(isTriPoly || isTriSidesGroup);
+    setTriSides(isTriSidesGroup ? (obj._triSides ?? { s0: true, s1: true, s2: true }) : { s0: true, s1: true, s2: true });
     setSelRx(obj.type === 'rect' ? Math.round(obj.rx ?? 0) : 0);
     if (obj.type === 'rect') {
       setRectSides({ top: true, right: true, bottom: true, left: true });
@@ -430,6 +436,8 @@ export default function StampEditorPage() {
         setSelectedObjType('');
         setLineCoords(null);
         setSelectedShapeType(null);
+        setShowTriSideToggle(false);
+        setTriSides({ s0: true, s1: true, s2: true });
       });
 
       // 回転中リアルタイム角度更新 ＋ ハンドル追従
@@ -861,6 +869,68 @@ export default function StampEditorPage() {
     setSelTrapRx(radius);
     replaceShape(newPath);
   }, [replaceShape]);
+
+  const toggleTriSide = useCallback((key: 's0' | 's1' | 's2') => {
+    const canvas = fabricRef.current;
+    const old = canvas?.getActiveObject() ?? lastActiveRef.current;
+    if (!canvas || !old) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric = (canvas as any)._fabric;
+    if (!fabric) return;
+
+    const newSides = { ...triSides, [key]: !triSides[key] };
+    setTriSides(newSides);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const o = old as any;
+    let pts: { x: number; y: number }[];
+    let stroke: string, strokeWidth: number;
+    if (o._shapeType === 'tri-sides') {
+      pts = o._triSidePoints ?? [];
+      stroke = o._triStroke ?? '#C9A84C'; strokeWidth = o._triStrokeW ?? 1.5;
+    } else if (o._shapeType === 'triangle' && o.type === 'polygon') {
+      pts = o.points as { x: number; y: number }[];
+      stroke = o.stroke ?? '#C9A84C'; strokeWidth = o.strokeWidth ?? 1.5;
+    } else {
+      return;
+    }
+    if (pts.length !== 3) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const center: { x: number; y: number } = (old as any).getCenterPoint?.() ?? { x: old.left, y: old.top };
+    const sideKeys: ('s0' | 's1' | 's2')[] = ['s0', 's1', 's2'];
+    const lineOpts = { stroke, strokeWidth, strokeUniform: true, fill: 'transparent' };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lines: any[] = [];
+    for (let i = 0; i < 3; i++) {
+      if (newSides[sideKeys[i]]) {
+        const p1 = pts[i], p2 = pts[(i + 1) % 3];
+        lines.push(new fabric.Line([p1.x, p1.y, p2.x, p2.y], lineOpts));
+      }
+    }
+
+    if (lines.length === 0) {
+      canvas.remove(old);
+      canvas.renderAll();
+      saveHistoryRef.current();
+      return;
+    }
+
+    const group = new fabric.Group(lines, {
+      left: center.x, top: center.y, originX: 'center', originY: 'center',
+      angle: old.angle ?? 0, scaleX: old.scaleX ?? 1, scaleY: old.scaleY ?? 1, opacity: old.opacity ?? 1,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._shapeType = 'tri-sides';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._triSidePoints = pts;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._triStroke = stroke; (group as any)._triStrokeW = strokeWidth;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._triSides = newSides;
+    setShowTriSideToggle(true);
+    replaceShape(group);
+  }, [triSides, replaceShape]);
 
   const toggleRectSide = useCallback((side: 'top' | 'right' | 'bottom' | 'left') => {
     const canvas = fabricRef.current;
@@ -1485,6 +1555,27 @@ export default function StampEditorPage() {
                   </div>
                 </div>
               )}
+
+              {/* 辺の表示切替（三角形） */}
+              {showTriSideToggle && (() => {
+                const sideBtn = (active: boolean): React.CSSProperties => ({
+                  background: active ? 'var(--accent)' : 'var(--bg)',
+                  color: active ? '#1A1A1A' : 'var(--text)',
+                  border: '1px solid var(--border)', borderRadius: 4,
+                  cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                  padding: 0, width: 28, height: 24,
+                });
+                return (
+                  <div>
+                    <div style={S.label}>辺の表示</div>
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 4 }}>
+                      <button onClick={() => toggleTriSide('s0')} style={sideBtn(triSides.s0)}>右</button>
+                      <button onClick={() => toggleTriSide('s1')} style={sideBtn(triSides.s1)}>底</button>
+                      <button onClick={() => toggleTriSide('s2')} style={sideBtn(triSides.s2)}>左</button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* 辺の表示切替（矩形・台形・菱形・rect-sides選択時） */}
               {showSideToggle && (() => {

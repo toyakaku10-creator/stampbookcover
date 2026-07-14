@@ -216,6 +216,8 @@ export default function CoverDesignerPage() {
   const [isRectSides, setIsRectSides] = useState(false);
   const [isFourSidedPoly, setIsFourSidedPoly] = useState(false);
   const [rectSides, setRectSides] = useState({ top: true, right: true, bottom: true, left: true });
+  const [showTriSideToggle, setShowTriSideToggle] = useState(false);
+  const [triSides, setTriSides] = useState({ s0: true, s1: true, s2: true });
 
   // 行列数直接指定
   const [cols, setCols] = useState(3);
@@ -316,9 +318,9 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const obj: any = canvas?.getActiveObject();
-    if (!obj) { setHasSelection(false); setIsStamp(false); setIsRectSides(false); setIsFourSidedPoly(false); return; }
+    if (!obj) { setHasSelection(false); setIsStamp(false); setIsRectSides(false); setIsFourSidedPoly(false); setShowTriSideToggle(false); setTriSides({ s0: true, s1: true, s2: true }); return; }
     setHasSelection(true);
-    setIsStamp(obj.type === 'group' && obj._shapeType !== 'rect-sides');
+    setIsStamp(obj.type === 'group' && obj._shapeType !== 'rect-sides' && obj._shapeType !== 'tri-sides');
     setIsRect(obj.type === 'rect');
     setIsRectSides(obj._shapeType === 'rect-sides');
     const poly4 = obj.type === 'polygon' && (obj.points?.length ?? 0) === 4;
@@ -326,6 +328,10 @@ export default function CoverDesignerPage() {
     setIsTrapezoid(obj._shapeType === 'trapezoid');
     setIsDiamond(obj._shapeType === 'h-diamond');
     setIsTriangle(obj._shapeType === 'triangle');
+    const isTriPoly = obj._shapeType === 'triangle' && obj.type === 'polygon';
+    const isTriSides = obj._shapeType === 'tri-sides';
+    setShowTriSideToggle(isTriPoly || isTriSides);
+    setTriSides(isTriSides ? (obj._triSides ?? { s0: true, s1: true, s2: true }) : { s0: true, s1: true, s2: true });
     if (obj.type === 'rect') {
       setRectSides({ top: true, right: true, bottom: true, left: true });
     } else if (obj._shapeType === 'rect-sides') {
@@ -1130,6 +1136,75 @@ export default function CoverDesignerPage() {
     saveHistoryRef.current();
   }, [rectSides]);
 
+  // ── 三角形 辺の表示切替 ──────────────────────────────────────────
+  const toggleTriSide = useCallback((key: 's0' | 's1' | 's2') => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const active: any = canvas?.getActiveObject();
+    if (!canvas || !active) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = (canvas as any)._fabric;
+    if (!fabric) return;
+
+    const newSides = { ...triSides, [key]: !triSides[key] };
+    setTriSides(newSides);
+
+    let pts: { x: number; y: number }[];
+    let stroke: string, strokeWidth: number;
+    if (active._shapeType === 'tri-sides') {
+      pts = active._triSidePoints ?? [];
+      stroke = active._triStroke ?? '#C9A84C'; strokeWidth = active._triStrokeW ?? 1.5;
+    } else if (active._shapeType === 'triangle' && active.type === 'polygon') {
+      pts = active.points as { x: number; y: number }[];
+      stroke = active.stroke ?? '#C9A84C'; strokeWidth = active.strokeWidth ?? 1.5;
+    } else {
+      return;
+    }
+    if (pts.length !== 3) return;
+
+    const angle = active.angle ?? 0, scaleX = active.scaleX ?? 1, scaleY = active.scaleY ?? 1, opacity = active.opacity ?? 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const center: { x: number; y: number } = active.getCenterPoint?.() ?? { x: active.left, y: active.top };
+    const sideKeys: ('s0' | 's1' | 's2')[] = ['s0', 's1', 's2'];
+    const lineOpts = { stroke, strokeWidth, strokeUniform: true, fill: 'transparent' };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lines: any[] = [];
+    for (let i = 0; i < 3; i++) {
+      if (newSides[sideKeys[i]]) {
+        const p1 = pts[i], p2 = pts[(i + 1) % 3];
+        lines.push(new fabric.Line([p1.x, p1.y, p2.x, p2.y], lineOpts));
+      }
+    }
+
+    if (lines.length === 0) {
+      canvas.remove(active);
+      canvas.renderAll();
+      saveHistoryRef.current();
+      return;
+    }
+
+    const group = new fabric.Group(lines, {
+      left: center.x, top: center.y, originX: 'center', originY: 'center',
+      angle, scaleX, scaleY, opacity,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._shapeType = 'tri-sides';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._triSidePoints = pts;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._triStroke = stroke;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._triStrokeW = strokeWidth;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._triSides = newSides;
+    canvas.remove(active);
+    canvas.add(group);
+    canvas.setActiveObject(group);
+    canvas.renderAll();
+    setShowTriSideToggle(true);
+    saveHistoryRef.current();
+  }, [triSides]);
+
   // ── プレビュー ────────────────────────────────────────────────────
   const openPreview = useCallback(() => {
     if (!fabricRef.current) return;
@@ -1824,6 +1899,26 @@ export default function CoverDesignerPage() {
                       </div>
                     </>
                   )}
+
+                  {showTriSideToggle && (() => {
+                    const sideBtn = (active: boolean): React.CSSProperties => ({
+                      background: active ? 'var(--accent)' : 'var(--bg)',
+                      color: active ? '#1A1A1A' : 'var(--text)',
+                      border: '1px solid var(--border)', borderRadius: 4,
+                      cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                      padding: 0, width: 28, height: 24,
+                    });
+                    return (
+                      <>
+                        <div style={S.sectionTitle}>辺の表示</div>
+                        <div style={{ padding: '0 12px 10px', display: 'flex', gap: 4, justifyContent: 'center' }}>
+                          <button onClick={() => toggleTriSide('s0')} style={sideBtn(triSides.s0)}>右</button>
+                          <button onClick={() => toggleTriSide('s1')} style={sideBtn(triSides.s1)}>底</button>
+                          <button onClick={() => toggleTriSide('s2')} style={sideBtn(triSides.s2)}>左</button>
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {(isRect || isRectSides || isFourSidedPoly) && (() => {
                     const sideBtn = (active: boolean): React.CSSProperties => ({

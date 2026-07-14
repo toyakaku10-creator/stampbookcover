@@ -212,6 +212,7 @@ export default function CoverDesignerPage() {
   const [isTrapezoid, setIsTrapezoid] = useState(false);
   const [selTrapRx, setSelTrapRx] = useState(0);
   const [isRectSides, setIsRectSides] = useState(false);
+  const [isFourSidedPoly, setIsFourSidedPoly] = useState(false);
   const [rectSides, setRectSides] = useState({ top: true, right: true, bottom: true, left: true });
 
   // 行列数直接指定
@@ -313,16 +314,20 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const obj: any = canvas?.getActiveObject();
-    if (!obj) { setHasSelection(false); setIsStamp(false); setIsRectSides(false); return; }
+    if (!obj) { setHasSelection(false); setIsStamp(false); setIsRectSides(false); setIsFourSidedPoly(false); return; }
     setHasSelection(true);
     setIsStamp(obj.type === 'group' && obj._shapeType !== 'rect-sides');
     setIsRect(obj.type === 'rect');
     setIsRectSides(obj._shapeType === 'rect-sides');
+    const poly4 = obj.type === 'polygon' && (obj.points?.length ?? 0) === 4;
+    setIsFourSidedPoly(poly4);
     setIsTrapezoid(obj._shapeType === 'trapezoid');
     if (obj.type === 'rect') {
       setRectSides({ top: true, right: true, bottom: true, left: true });
     } else if (obj._shapeType === 'rect-sides') {
       setRectSides(obj._rectSides ?? { top: true, right: true, bottom: true, left: true });
+    } else if (poly4) {
+      setRectSides({ top: true, right: true, bottom: true, left: true });
     }
     setSelFill(typeof obj.fill === 'string' && obj.fill ? obj.fill : '#000000');
     setSelStroke(typeof obj.stroke === 'string' && obj.stroke ? obj.stroke : '#000000');
@@ -969,7 +974,7 @@ export default function CoverDesignerPage() {
     saveHistoryRef.current();
   }, []);
 
-  // ── 矩形 辺の表示切替 ──────────────────────────────────────────────
+  // ── 4辺図形 辺の表示切替 ──────────────────────────────────────────
   const toggleRectSide = useCallback((side: 'top' | 'right' | 'bottom' | 'left') => {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -982,26 +987,41 @@ export default function CoverDesignerPage() {
     const newSides = { ...rectSides, [side]: !rectSides[side] };
     setRectSides(newSides);
 
-    let w: number, h: number, stroke: string, strokeWidth: number, opacity: number, angle: number, scaleX: number, scaleY: number;
+    // 中心揃え済み4頂点を取得
+    let pts: { x: number; y: number }[];
+    let stroke: string, strokeWidth: number;
     if (active._shapeType === 'rect-sides') {
-      w = active._rectW ?? 60; h = active._rectH ?? 60;
+      pts = active._sidePoints ?? (() => {
+        const hw = (active._rectW ?? 60) / 2, hh = (active._rectH ?? 60) / 2;
+        return [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }];
+      })();
       stroke = active._rectStroke ?? '#C9A84C'; strokeWidth = active._rectStrokeW ?? 1.5;
-    } else {
-      w = active.width ?? 60; h = active.height ?? 60;
+    } else if (active.type === 'rect') {
+      const hw = (active.width ?? 60) / 2, hh = (active.height ?? 60) / 2;
+      pts = [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }];
       stroke = active.stroke ?? '#C9A84C'; strokeWidth = active.strokeWidth ?? 1.5;
+    } else if (active.type === 'polygon') {
+      // Fabric v6+ の polygon.points は中心揃え済み
+      pts = active.points as { x: number; y: number }[];
+      stroke = active.stroke ?? '#C9A84C'; strokeWidth = active.strokeWidth ?? 1.5;
+    } else {
+      return;
     }
-    angle = active.angle ?? 0; scaleX = active.scaleX ?? 1; scaleY = active.scaleY ?? 1; opacity = active.opacity ?? 1;
+    if (pts.length !== 4) return;
 
+    const angle = active.angle ?? 0, scaleX = active.scaleX ?? 1, scaleY = active.scaleY ?? 1, opacity = active.opacity ?? 1;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const center: { x: number; y: number } = active.getCenterPoint?.() ?? { x: active.left, y: active.top };
-    const hw = w / 2, hh = h / 2;
+    const sideKeys: ('top' | 'right' | 'bottom' | 'left')[] = ['top', 'right', 'bottom', 'left'];
     const lineOpts = { stroke, strokeWidth, strokeUniform: true, fill: 'transparent' };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const lines: any[] = [];
-    if (newSides.top)    lines.push(new fabric.Line([-hw, -hh,  hw, -hh], lineOpts));
-    if (newSides.right)  lines.push(new fabric.Line([ hw, -hh,  hw,  hh], lineOpts));
-    if (newSides.bottom) lines.push(new fabric.Line([ hw,  hh, -hw,  hh], lineOpts));
-    if (newSides.left)   lines.push(new fabric.Line([-hw,  hh, -hw, -hh], lineOpts));
+    for (let i = 0; i < 4; i++) {
+      if (newSides[sideKeys[i]]) {
+        const p1 = pts[i], p2 = pts[(i + 1) % 4];
+        lines.push(new fabric.Line([p1.x, p1.y, p2.x, p2.y], lineOpts));
+      }
+    }
 
     if (lines.length === 0) {
       canvas.remove(active);
@@ -1017,9 +1037,7 @@ export default function CoverDesignerPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (group as any)._shapeType = 'rect-sides';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (group as any)._rectW = w;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (group as any)._rectH = h;
+    (group as any)._sidePoints = pts;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (group as any)._rectStroke = stroke;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1031,6 +1049,7 @@ export default function CoverDesignerPage() {
     canvas.setActiveObject(group);
     canvas.renderAll();
     setIsRect(false);
+    setIsFourSidedPoly(false);
     setIsRectSides(true);
     saveHistoryRef.current();
   }, [rectSides]);
@@ -1704,7 +1723,7 @@ export default function CoverDesignerPage() {
                     </>
                   )}
 
-                  {(isRect || isRectSides) && (() => {
+                  {(isRect || isRectSides || isFourSidedPoly) && (() => {
                     const sideBtn = (active: boolean): React.CSSProperties => ({
                       background: active ? 'var(--accent)' : 'var(--bg)',
                       color: active ? '#1A1A1A' : 'var(--text)',

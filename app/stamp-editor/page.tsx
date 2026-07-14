@@ -196,6 +196,7 @@ export default function StampEditorPage() {
   const [selRx, setSelRx] = useState(0);
   const [selTrapRx, setSelTrapRx] = useState(0);
   const [rectSides, setRectSides] = useState({ top: true, right: true, bottom: true, left: true });
+  const [showSideToggle, setShowSideToggle] = useState(false);
   // カスタム形状の種類
   const [selectedShapeType, setSelectedShapeType] = useState<'trapezoid' | 'arc' | 'dot' | null>(null);
   // 台形プロパティ
@@ -236,7 +237,7 @@ export default function StampEditorPage() {
   // ── 選択オブジェクトからパネルへ同期 ─────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const syncFromObj = useCallback((obj: any) => {
-    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); setRectSides({ top: true, right: true, bottom: true, left: true }); return; }
+    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); setRectSides({ top: true, right: true, bottom: true, left: true }); setShowSideToggle(false); return; }
     const props = getEffectiveProps(obj);
     isApplyingFromSelRef.current = true;
     setColor(props.stroke);
@@ -245,12 +246,16 @@ export default function StampEditorPage() {
     setCurrentAngle(Math.round(obj.angle ?? 0));
     setHasSelection(true);
     const isRectSidesGroup = obj._shapeType === 'rect-sides';
+    const poly4 = obj.type === 'polygon' && (obj.points?.length ?? 0) === 4;
     setSelectedObjType(obj.type === 'rect' ? 'rect' : isRectSidesGroup ? 'rect-sides' : (obj.type ?? ''));
+    setShowSideToggle(obj.type === 'rect' || isRectSidesGroup || poly4);
     setSelRx(obj.type === 'rect' ? Math.round(obj.rx ?? 0) : 0);
     if (obj.type === 'rect') {
       setRectSides({ top: true, right: true, bottom: true, left: true });
     } else if (isRectSidesGroup) {
       setRectSides(obj._rectSides ?? { top: true, right: true, bottom: true, left: true });
+    } else if (poly4) {
+      setRectSides({ top: true, right: true, bottom: true, left: true });
     }
     if (obj.type === 'line') {
       const coords = getLineAbsCoords(obj);
@@ -806,21 +811,38 @@ export default function StampEditorPage() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const o = old as any;
-    const isGroup = o._shapeType === 'rect-sides';
-    const w: number = isGroup ? (o._rectW ?? 60) : (o.width ?? 60);
-    const h: number = isGroup ? (o._rectH ?? 60) : (o.height ?? 60);
-    const stroke: string = isGroup ? (o._rectStroke ?? '#C9A84C') : (o.stroke ?? '#C9A84C');
-    const strokeWidth: number = isGroup ? (o._rectStrokeW ?? 1.5) : (o.strokeWidth ?? 1.5);
+    let pts: { x: number; y: number }[];
+    let stroke: string, strokeWidth: number;
+    if (o._shapeType === 'rect-sides') {
+      pts = o._sidePoints ?? (() => {
+        const hw = (o._rectW ?? 60) / 2, hh = (o._rectH ?? 60) / 2;
+        return [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }];
+      })();
+      stroke = o._rectStroke ?? '#C9A84C'; strokeWidth = o._rectStrokeW ?? 1.5;
+    } else if (o.type === 'rect') {
+      const hw = (o.width ?? 60) / 2, hh = (o.height ?? 60) / 2;
+      pts = [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }];
+      stroke = o.stroke ?? '#C9A84C'; strokeWidth = o.strokeWidth ?? 1.5;
+    } else if (o.type === 'polygon') {
+      pts = o.points as { x: number; y: number }[];
+      stroke = o.stroke ?? '#C9A84C'; strokeWidth = o.strokeWidth ?? 1.5;
+    } else {
+      return;
+    }
+    if (pts.length !== 4) return;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const center: { x: number; y: number } = (old as any).getCenterPoint?.() ?? { x: old.left, y: old.top };
-    const hw = w / 2, hh = h / 2;
+    const sideKeys: ('top' | 'right' | 'bottom' | 'left')[] = ['top', 'right', 'bottom', 'left'];
     const lineOpts = { stroke, strokeWidth, strokeUniform: true, fill: 'transparent' };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const lines: any[] = [];
-    if (newSides.top)    lines.push(new fabric.Line([-hw, -hh,  hw, -hh], lineOpts));
-    if (newSides.right)  lines.push(new fabric.Line([ hw, -hh,  hw,  hh], lineOpts));
-    if (newSides.bottom) lines.push(new fabric.Line([ hw,  hh, -hw,  hh], lineOpts));
-    if (newSides.left)   lines.push(new fabric.Line([-hw,  hh, -hw, -hh], lineOpts));
+    for (let i = 0; i < 4; i++) {
+      if (newSides[sideKeys[i]]) {
+        const p1 = pts[i], p2 = pts[(i + 1) % 4];
+        lines.push(new fabric.Line([p1.x, p1.y, p2.x, p2.y], lineOpts));
+      }
+    }
 
     if (lines.length === 0) {
       canvas.remove(old);
@@ -836,12 +858,13 @@ export default function StampEditorPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (group as any)._shapeType = 'rect-sides';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (group as any)._rectW = w; (group as any)._rectH = h;
+    (group as any)._sidePoints = pts;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (group as any)._rectStroke = stroke; (group as any)._rectStrokeW = strokeWidth;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (group as any)._rectSides = newSides;
     setSelectedObjType('rect-sides');
+    setShowSideToggle(true);
     replaceShape(group);
   }, [rectSides, replaceShape]);
 
@@ -1369,8 +1392,8 @@ export default function StampEditorPage() {
                 </div>
               )}
 
-              {/* 辺の表示切替（矩形・rect-sides選択時のみ） */}
-              {(selectedObjType === 'rect' || selectedObjType === 'rect-sides') && (() => {
+              {/* 辺の表示切替（矩形・台形・菱形・rect-sides選択時） */}
+              {showSideToggle && (() => {
                 const sideBtn = (active: boolean): React.CSSProperties => ({
                   background: active ? 'var(--accent)' : 'var(--bg)',
                   color: active ? '#1A1A1A' : 'var(--text)',

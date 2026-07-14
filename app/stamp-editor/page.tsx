@@ -198,7 +198,7 @@ export default function StampEditorPage() {
   const [rectSides, setRectSides] = useState({ top: true, right: true, bottom: true, left: true });
   const [showSideToggle, setShowSideToggle] = useState(false);
   // カスタム形状の種類
-  const [selectedShapeType, setSelectedShapeType] = useState<'trapezoid' | 'arc' | 'dot' | null>(null);
+  const [selectedShapeType, setSelectedShapeType] = useState<'trapezoid' | 'arc' | 'dot' | 'h-diamond' | null>(null);
   // 台形プロパティ
   const [trapTop, setTrapTop]       = useState(60);
   const [trapBottom, setTrapBottom] = useState(90);
@@ -264,13 +264,16 @@ export default function StampEditorPage() {
       setLineCoords(null);
     }
     // カスタム形状
-    const st = obj._shapeType as 'trapezoid' | 'arc' | 'dot' | undefined;
+    const st = obj._shapeType as 'trapezoid' | 'arc' | 'dot' | 'h-diamond' | undefined;
     if (st === 'trapezoid') {
       setSelectedShapeType('trapezoid');
       setTrapTop(obj._trapTop ?? 60);
       setTrapBottom(obj._trapBottom ?? 90);
       setTrapHeight(obj._trapHeight ?? 50);
       setSelTrapRx(obj._trapRadius ?? 0);
+    } else if (st === 'h-diamond') {
+      setSelectedShapeType('h-diamond');
+      setSelTrapRx(obj._diamondRadius ?? 0);
     } else if (st === 'arc') {
       setSelectedShapeType('arc');
       setArcRadius(obj._arcRadius ?? 45);
@@ -798,6 +801,35 @@ export default function StampEditorPage() {
     replaceShape(newPath);
   }, [replaceShape]);
 
+  const applyDiamondRadius = useCallback((radius: number) => {
+    const canvas = fabricRef.current;
+    const old = canvas?.getActiveObject() ?? lastActiveRef.current;
+    if (!canvas || !old || (old as any)._shapeType !== 'h-diamond') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric = (canvas as any)._fabric;
+    if (!fabric) return;
+    const W = 60, H = Math.round(W * Math.sqrt(3));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const points: { x: number; y: number }[] = (old as any)._diamondPoints ?? [
+      { x: W / 2, y: 0 }, { x: W, y: H / 2 }, { x: W / 2, y: H }, { x: 0, y: H / 2 },
+    ];
+    const pathStr = roundedPolygonPath(points, radius);
+    const newPath = new fabric.Path(pathStr, {
+      left: old.left, top: old.top, angle: old.angle,
+      scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
+      stroke: old.stroke, strokeWidth: old.strokeWidth,
+      fill: old.fill, strokeUniform: true,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._shapeType = 'h-diamond';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._diamondPoints = points;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._diamondRadius = radius;
+    setSelTrapRx(radius);
+    replaceShape(newPath);
+  }, [replaceShape]);
+
   const toggleRectSide = useCallback((side: 'top' | 'right' | 'bottom' | 'left') => {
     const canvas = fabricRef.current;
     const old = canvas?.getActiveObject() ?? lastActiveRef.current;
@@ -1236,6 +1268,21 @@ export default function StampEditorPage() {
                     {item.icon}
                   </button>
                 ))}
+              </div>
+            </>
+          )}
+
+          {/* ── 菱形プロパティ ───────────────────────────────── */}
+          {selectedShapeType === 'h-diamond' && (
+            <>
+              <div style={{ height: 1, background: 'var(--border)' }} />
+              <div>
+                <div style={S.label}>菱形 角の丸み</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <button onClick={() => applyDiamondRadius(Math.max(0, selTrapRx - 2))} style={S.actionBtn()}><Minus size={12} /></button>
+                  <span style={{ flex: 1, textAlign: 'center', fontSize: 12, color: 'var(--text)' }}>{selTrapRx}</span>
+                  <button onClick={() => applyDiamondRadius(selTrapRx + 2)} style={S.actionBtn()}><Plus size={12} /></button>
+                </div>
               </div>
             </>
           )}

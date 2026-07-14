@@ -92,10 +92,15 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
   }
   if (toolId === 'h-diamond') {
     const W = 60, H = Math.round(W * Math.sqrt(3));
-    return new fabric.Polygon(
-      [{ x: W / 2, y: 0 }, { x: W, y: H / 2 }, { x: W / 2, y: H }, { x: 0, y: H / 2 }],
-      { ...opts, left: cx - W / 2, top: cy - H / 2 },
-    );
+    const diamondPts = [{ x: W / 2, y: 0 }, { x: W, y: H / 2 }, { x: W / 2, y: H }, { x: 0, y: H / 2 }];
+    const poly = new fabric.Polygon(diamondPts, { ...opts, left: cx - W / 2, top: cy - H / 2 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (poly as any)._shapeType = 'h-diamond';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (poly as any)._diamondPoints = diamondPts;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (poly as any)._diamondRadius = 0;
+    return poly;
   }
   if (toolId === 'trapezoid') {
     const topW = 60, botW = 90, h = 50;

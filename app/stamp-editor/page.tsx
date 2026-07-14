@@ -1381,7 +1381,7 @@ export default function StampEditorPage() {
 
           <div style={{ height: 1, background: 'var(--border)' }} />
 
-          <button onClick={exportStamps} style={{ ...S.btn(), fontSize: 11, padding: '5px 8px', gap: 4 }}>
+          <button onClick={exportStamps} style={{ ...S.btn(), fontSize: 11, padding: '5px 8px', gap: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Download size={12} /> 書き出し
           </button>
           <label style={{ ...S.btn(), fontSize: 11, padding: '5px 8px', gap: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

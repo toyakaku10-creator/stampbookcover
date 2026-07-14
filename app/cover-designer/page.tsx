@@ -211,6 +211,7 @@ export default function CoverDesignerPage() {
   const [selRx, setSelRx] = useState(0);
   const [isTrapezoid, setIsTrapezoid] = useState(false);
   const [isDiamond, setIsDiamond] = useState(false);
+  const [isTriangle, setIsTriangle] = useState(false);
   const [selTrapRx, setSelTrapRx] = useState(0);
   const [isRectSides, setIsRectSides] = useState(false);
   const [isFourSidedPoly, setIsFourSidedPoly] = useState(false);
@@ -324,6 +325,7 @@ export default function CoverDesignerPage() {
     setIsFourSidedPoly(poly4);
     setIsTrapezoid(obj._shapeType === 'trapezoid');
     setIsDiamond(obj._shapeType === 'h-diamond');
+    setIsTriangle(obj._shapeType === 'triangle');
     if (obj.type === 'rect') {
       setRectSides({ top: true, right: true, bottom: true, left: true });
     } else if (obj._shapeType === 'rect-sides') {
@@ -338,7 +340,7 @@ export default function CoverDesignerPage() {
     setSelAngle(Math.round(obj.angle ?? 0));
     setSelSize(Math.round(Math.max(obj.getScaledWidth?.() ?? 0, obj.getScaledHeight?.() ?? 0)));
     setSelRx(Math.round(obj.rx ?? 0));
-    setSelTrapRx(obj._shapeType === 'trapezoid' ? Math.round(obj._trapRadius ?? 0) : obj._shapeType === 'h-diamond' ? Math.round(obj._diamondRadius ?? 0) : 0);
+    setSelTrapRx(obj._shapeType === 'trapezoid' ? Math.round(obj._trapRadius ?? 0) : obj._shapeType === 'h-diamond' ? Math.round(obj._diamondRadius ?? 0) : obj._shapeType === 'triangle' ? Math.round(obj._triangleRadius ?? 0) : 0);
   }, []);
 
   const updateSelPropsRef = useRef(updateSelProps);
@@ -1009,6 +1011,42 @@ export default function CoverDesignerPage() {
     canvas.renderAll();
     setSelTrapRx(radius);
     setIsDiamond(true);
+    saveHistoryRef.current();
+  }, []);
+
+  // ── 三角形 角の丸み ────────────────────────────────────────────────
+  const applyTriangleRadius = useCallback(async (radius: number) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const old: any = canvas?.getActiveObject();
+    if (!canvas || !old || old._shapeType !== 'triangle') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod: any = await import('fabric');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = mod.fabric ?? mod.default ?? mod;
+    const SIDE = 80, HEIGHT = Math.round(SIDE * (Math.sqrt(3) / 2));
+    const points: { x: number; y: number }[] = old._trianglePoints ?? [
+      { x: SIDE / 2, y: 0 }, { x: SIDE, y: HEIGHT }, { x: 0, y: HEIGHT },
+    ];
+    const pathStr = roundedPolygonPath(points, radius);
+    const newPath = new fabric.Path(pathStr, {
+      left: old.left, top: old.top, angle: old.angle,
+      scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
+      stroke: old.stroke, strokeWidth: old.strokeWidth,
+      fill: old.fill, strokeUniform: true,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._shapeType = 'triangle';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._trianglePoints = points;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newPath as any)._triangleRadius = radius;
+    canvas.remove(old);
+    canvas.add(newPath);
+    canvas.setActiveObject(newPath);
+    canvas.renderAll();
+    setSelTrapRx(radius);
+    setIsTriangle(true);
     saveHistoryRef.current();
   }, []);
 
@@ -1769,6 +1807,19 @@ export default function CoverDesignerPage() {
                           style={S.iconBtn()}><Minus size={12} /></button>
                         <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{selTrapRx}</span>
                         <button onClick={() => applyDiamondRadius(selTrapRx + 2)}
+                          style={S.iconBtn()}><Plus size={12} /></button>
+                      </div>
+                    </>
+                  )}
+
+                  {isTriangle && (
+                    <>
+                      <div style={S.sectionTitle}>角の丸み</div>
+                      <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <button onClick={() => applyTriangleRadius(Math.max(0, selTrapRx - 2))}
+                          style={S.iconBtn()}><Minus size={12} /></button>
+                        <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{selTrapRx}</span>
+                        <button onClick={() => applyTriangleRadius(selTrapRx + 2)}
                           style={S.iconBtn()}><Plus size={12} /></button>
                       </div>
                     </>

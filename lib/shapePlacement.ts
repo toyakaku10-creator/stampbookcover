@@ -66,7 +66,15 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
   if (toolId === 'triangle') {
     const SIDE = 80;
     const HEIGHT = Math.round(SIDE * (Math.sqrt(3) / 2));
-    return new fabric.Triangle({ ...opts, ...pos, width: SIDE, height: HEIGHT });
+    const triPts = [{ x: SIDE / 2, y: 0 }, { x: SIDE, y: HEIGHT }, { x: 0, y: HEIGHT }];
+    const poly = new fabric.Polygon(triPts, { ...opts, left: cx - SIDE / 2, top: cy - HEIGHT / 2 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (poly as any)._shapeType = 'triangle';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (poly as any)._trianglePoints = triPts;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (poly as any)._triangleRadius = 0;
+    return poly;
   }
 
   if (toolId === 'polygon') {

@@ -11,7 +11,7 @@ import {
 import { Tool } from '@/lib/types';
 import { saveStamp, getStamps, deleteStamp, renameStamp } from '@/lib/stampStorage';
 import type { Stamp } from '@/lib/types';
-import { buildArcPath, buildObjectAt, roundedPolygonPath } from '@/lib/shapePlacement';
+import { buildArcPath, buildObjectAt, roundedPolygonPath, buildSegmentGroup } from '@/lib/shapePlacement';
 import AppHeader from '@/components/AppHeader';
 import { ensureHimmeliStamps } from '@/lib/himmeliStamps';
 
@@ -200,7 +200,9 @@ export default function StampEditorPage() {
   const [showTriSideToggle, setShowTriSideToggle] = useState(false);
   const [triSides, setTriSides] = useState({ s0: true, s1: true, s2: true });
   // カスタム形状の種類
-  const [selectedShapeType, setSelectedShapeType] = useState<'trapezoid' | 'arc' | 'dot' | 'h-diamond' | 'triangle' | null>(null);
+  const [selectedShapeType, setSelectedShapeType] = useState<'trapezoid' | 'arc' | 'dot' | 'h-diamond' | 'triangle' | 'mseg' | null>(null);
+  const [msegRadius, setMsegRadius] = useState(0);
+  const [msegSides, setMsegSides] = useState([true, true, true, true]);
   // 台形プロパティ
   const [trapTop, setTrapTop]       = useState(60);
   const [trapBottom, setTrapBottom] = useState(90);
@@ -239,7 +241,7 @@ export default function StampEditorPage() {
   // ── 選択オブジェクトからパネルへ同期 ─────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const syncFromObj = useCallback((obj: any) => {
-    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); setRectSides({ top: true, right: true, bottom: true, left: true }); setShowSideToggle(false); setShowTriSideToggle(false); setTriSides({ s0: true, s1: true, s2: true }); return; }
+    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); setRectSides({ top: true, right: true, bottom: true, left: true }); setShowSideToggle(false); setShowTriSideToggle(false); setTriSides({ s0: true, s1: true, s2: true }); setMsegRadius(0); setMsegSides([true, true, true, true]); return; }
     const props = getEffectiveProps(obj);
     isApplyingFromSelRef.current = true;
     setColor(props.stroke);
@@ -270,8 +272,12 @@ export default function StampEditorPage() {
       setLineCoords(null);
     }
     // カスタム形状
-    const st = obj._shapeType as 'trapezoid' | 'arc' | 'dot' | 'h-diamond' | 'triangle' | undefined;
-    if (st === 'trapezoid') {
+    const st = obj._shapeType as 'trapezoid' | 'arc' | 'dot' | 'h-diamond' | 'triangle' | 'mseg' | undefined;
+    if (st === 'mseg') {
+      setSelectedShapeType('mseg');
+      setMsegRadius((obj._msegRadius as number) ?? 0);
+      setMsegSides([...((obj._msegSides as boolean[]) ?? [true, true, true, true])]);
+    } else if (st === 'trapezoid') {
       setSelectedShapeType('trapezoid');
       setTrapTop(obj._trapTop ?? 60);
       setTrapBottom(obj._trapBottom ?? 90);
@@ -438,6 +444,8 @@ export default function StampEditorPage() {
         setSelectedShapeType(null);
         setShowTriSideToggle(false);
         setTriSides({ s0: true, s1: true, s2: true });
+        setMsegRadius(0);
+        setMsegSides([true, true, true, true]);
       });
 
       // 回転中リアルタイム角度更新 ＋ ハンドル追従
@@ -868,6 +876,70 @@ export default function StampEditorPage() {
     (newPath as any)._triangleRadius = radius;
     setSelTrapRx(radius);
     replaceShape(newPath);
+  }, [replaceShape]);
+
+  const applyMsegRadius = useCallback((radius: number) => {
+    const canvas = fabricRef.current;
+    const old = canvas?.getActiveObject() ?? lastActiveRef.current;
+    if (!canvas || !old || (old as any)._shapeType !== 'mseg') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric = (canvas as any)._fabric;
+    if (!fabric) return;
+    const corners = (old as any)._msegCorners as { x: number; y: number }[];
+    const sides   = (old as any)._msegSides   as boolean[];
+    const children = (old as any).getObjects?.() ?? [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const firstChild: any = children[0];
+    const stroke = firstChild?.stroke ?? '#C9A84C';
+    const sw     = firstChild?.strokeWidth ?? 1.5;
+    const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, {
+      left: old.left, top: old.top, angle: old.angle,
+      scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
+      originX: old.originX, originY: old.originY,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._shapeType   = 'mseg';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegCorners = corners;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegRadius  = radius;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegSides   = sides;
+    setMsegRadius(radius);
+    replaceShape(newGroup);
+  }, [replaceShape]);
+
+  const toggleMsegSide = useCallback((idx: number) => {
+    const canvas = fabricRef.current;
+    const old = canvas?.getActiveObject() ?? lastActiveRef.current;
+    if (!canvas || !old || (old as any)._shapeType !== 'mseg') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric = (canvas as any)._fabric;
+    if (!fabric) return;
+    const corners = (old as any)._msegCorners as { x: number; y: number }[];
+    const radius  = ((old as any)._msegRadius as number) ?? 0;
+    const newSides = [...((old as any)._msegSides as boolean[])];
+    newSides[idx] = !newSides[idx];
+    const children = (old as any).getObjects?.() ?? [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const firstChild: any = children[0];
+    const stroke = firstChild?.stroke ?? '#C9A84C';
+    const sw     = firstChild?.strokeWidth ?? 1.5;
+    const newGroup = buildSegmentGroup(fabric, corners, radius, newSides, stroke, sw, {
+      left: old.left, top: old.top, angle: old.angle,
+      scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
+      originX: old.originX, originY: old.originY,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._shapeType   = 'mseg';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegCorners = corners;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegRadius  = radius;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegSides   = newSides;
+    setMsegSides(newSides);
+    replaceShape(newGroup);
   }, [replaceShape]);
 
   const toggleTriSide = useCallback((key: 's0' | 's1' | 's2') => {
@@ -1373,6 +1445,39 @@ export default function StampEditorPage() {
               </div>
             </>
           )}
+
+          {/* ── mseg（矩形マルチセグメント）プロパティ ──────── */}
+          {selectedShapeType === 'mseg' && (() => {
+            const sideLabels = ['上', '右', '下', '左'];
+            const sideBtn = (active: boolean): React.CSSProperties => ({
+              background: active ? 'var(--accent)' : 'var(--bg)',
+              color: active ? '#1A1A1A' : 'var(--text)',
+              border: '1px solid var(--border)', borderRadius: 4,
+              cursor: 'pointer', fontSize: 10, fontWeight: 600,
+              padding: 0, width: 28, height: 24,
+            });
+            return (
+              <>
+                <div style={{ height: 1, background: 'var(--border)' }} />
+                <div>
+                  <div style={S.label}>角の丸み</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button onClick={() => applyMsegRadius(Math.max(0, msegRadius - 2))} style={S.actionBtn()}><Minus size={12} /></button>
+                    <span style={{ flex: 1, textAlign: 'center', fontSize: 12, color: 'var(--text)' }}>{msegRadius}</span>
+                    <button onClick={() => applyMsegRadius(msegRadius + 2)} style={S.actionBtn()}><Plus size={12} /></button>
+                  </div>
+                </div>
+                <div>
+                  <div style={S.label}>辺の表示</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 24px)', gap: 2, justifyContent: 'center' }}>
+                    <div /><button onClick={() => toggleMsegSide(0)} style={sideBtn(msegSides[0])}>{sideLabels[0]}</button><div />
+                    <button onClick={() => toggleMsegSide(3)} style={sideBtn(msegSides[3])}>{sideLabels[3]}</button><div /><button onClick={() => toggleMsegSide(1)} style={sideBtn(msegSides[1])}>{sideLabels[1]}</button>
+                    <div /><button onClick={() => toggleMsegSide(2)} style={sideBtn(msegSides[2])}>{sideLabels[2]}</button><div />
+                  </div>
+                </div>
+              </>
+            );
+          })()}
 
           {/* ── 菱形プロパティ ───────────────────────────────── */}
           {selectedShapeType === 'h-diamond' && (

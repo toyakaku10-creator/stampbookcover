@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { Stamp as StampType, Tool } from '@/lib/types';
 import { getStamps } from '@/lib/stampStorage';
-import { buildObjectAt, roundedPolygonPath } from '@/lib/shapePlacement';
+import { buildObjectAt, roundedPolygonPath, buildSegmentGroup } from '@/lib/shapePlacement';
 
 const COVER_PRESETS = [
   { name: '応募サイズ', w: 385, h: 152, locked: true },
@@ -212,6 +212,9 @@ export default function CoverDesignerPage() {
   const [isTrapezoid, setIsTrapezoid] = useState(false);
   const [isDiamond, setIsDiamond] = useState(false);
   const [isTriangle, setIsTriangle] = useState(false);
+  const [isMseg, setIsMseg] = useState(false);
+  const [msegRadius, setMsegRadius] = useState(0);
+  const [msegSides, setMsegSides] = useState([true, true, true, true]);
   const [selTrapRx, setSelTrapRx] = useState(0);
   const [isRectSides, setIsRectSides] = useState(false);
   const [isFourSidedPoly, setIsFourSidedPoly] = useState(false);
@@ -318,9 +321,9 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const obj: any = canvas?.getActiveObject();
-    if (!obj) { setHasSelection(false); setIsStamp(false); setIsRectSides(false); setIsFourSidedPoly(false); setShowTriSideToggle(false); setTriSides({ s0: true, s1: true, s2: true }); return; }
+    if (!obj) { setHasSelection(false); setIsStamp(false); setIsRectSides(false); setIsFourSidedPoly(false); setShowTriSideToggle(false); setTriSides({ s0: true, s1: true, s2: true }); setIsMseg(false); return; }
     setHasSelection(true);
-    setIsStamp(obj.type === 'group' && obj._shapeType !== 'rect-sides' && obj._shapeType !== 'tri-sides');
+    setIsStamp(obj.type === 'group' && obj._shapeType !== 'rect-sides' && obj._shapeType !== 'tri-sides' && obj._shapeType !== 'mseg');
     setIsRect(obj.type === 'rect');
     setIsRectSides(obj._shapeType === 'rect-sides');
     const poly4 = obj.type === 'polygon' && (obj.points?.length ?? 0) === 4;
@@ -328,6 +331,12 @@ export default function CoverDesignerPage() {
     setIsTrapezoid(obj._shapeType === 'trapezoid');
     setIsDiamond(obj._shapeType === 'h-diamond');
     setIsTriangle(obj._shapeType === 'triangle');
+    const isMsegObj = obj._shapeType === 'mseg';
+    setIsMseg(isMsegObj);
+    if (isMsegObj) {
+      setMsegRadius(obj._msegRadius ?? 0);
+      setMsegSides([...((obj._msegSides as boolean[]) ?? [true, true, true, true])]);
+    }
     const isTriPoly = obj._shapeType === 'triangle' && obj.type === 'polygon';
     const isTriSides = obj._shapeType === 'tri-sides';
     setShowTriSideToggle(isTriPoly || isTriSides);
@@ -357,6 +366,15 @@ export default function CoverDesignerPage() {
     const obj = canvas?.getActiveObject();
     if (!obj || !canvas) return;
     obj.set(props);
+    // mseg グループはストローク関連プロパティを子に伝播
+    if ((obj as any)._shapeType === 'mseg') {
+      const strokeProps: Record<string, unknown> = {};
+      if ('stroke'      in (props as any)) strokeProps.stroke      = (props as any).stroke;
+      if ('strokeWidth' in (props as any)) strokeProps.strokeWidth = (props as any).strokeWidth;
+      if (Object.keys(strokeProps).length > 0) {
+        (obj as any).getObjects?.()?.forEach((child: any) => child.set(strokeProps));
+      }
+    }
     canvas.renderAll();
   }, []);
 
@@ -1136,6 +1154,82 @@ export default function CoverDesignerPage() {
     saveHistoryRef.current();
   }, [rectSides]);
 
+  // ── mseg 角の丸み ──────────────────────────────────────────────────
+  const applyMsegRadius = useCallback((radius: number) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const old: any = canvas?.getActiveObject();
+    if (!canvas || !old || old._shapeType !== 'mseg') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = (canvas as any)._fabric;
+    if (!fabric) return;
+    const corners = old._msegCorners as { x: number; y: number }[];
+    const sides   = old._msegSides   as boolean[];
+    const children = old.getObjects?.() ?? [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const firstChild: any = children[0];
+    const stroke = firstChild?.stroke ?? '#C9A84C';
+    const sw     = firstChild?.strokeWidth ?? 1.5;
+    const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, {
+      left: old.left, top: old.top, angle: old.angle ?? 0,
+      scaleX: old.scaleX ?? 1, scaleY: old.scaleY ?? 1, opacity: old.opacity ?? 1,
+      originX: old.originX ?? 'left', originY: old.originY ?? 'top',
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._shapeType   = 'mseg';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegCorners = corners;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegRadius  = radius;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegSides   = sides;
+    canvas.remove(old);
+    canvas.add(newGroup);
+    canvas.setActiveObject(newGroup);
+    canvas.renderAll();
+    setMsegRadius(radius);
+    saveHistoryRef.current();
+  }, []);
+
+  // ── mseg 辺の表示切替 ──────────────────────────────────────────────
+  const toggleMsegSide = useCallback((idx: number) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const old: any = canvas?.getActiveObject();
+    if (!canvas || !old || old._shapeType !== 'mseg') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = (canvas as any)._fabric;
+    if (!fabric) return;
+    const corners = old._msegCorners as { x: number; y: number }[];
+    const radius  = old._msegRadius  as number ?? 0;
+    const newSides = [...(old._msegSides as boolean[])];
+    newSides[idx] = !newSides[idx];
+    const children = old.getObjects?.() ?? [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const firstChild: any = children[0];
+    const stroke = firstChild?.stroke ?? '#C9A84C';
+    const sw     = firstChild?.strokeWidth ?? 1.5;
+    const newGroup = buildSegmentGroup(fabric, corners, radius, newSides, stroke, sw, {
+      left: old.left, top: old.top, angle: old.angle ?? 0,
+      scaleX: old.scaleX ?? 1, scaleY: old.scaleY ?? 1, opacity: old.opacity ?? 1,
+      originX: old.originX ?? 'left', originY: old.originY ?? 'top',
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._shapeType   = 'mseg';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegCorners = corners;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegRadius  = radius;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newGroup as any)._msegSides   = newSides;
+    canvas.remove(old);
+    canvas.add(newGroup);
+    canvas.setActiveObject(newGroup);
+    canvas.renderAll();
+    setMsegSides(newSides);
+    saveHistoryRef.current();
+  }, []);
+
   // ── 三角形 辺の表示切替 ──────────────────────────────────────────
   const toggleTriSide = useCallback((key: 's0' | 's1' | 's2') => {
     const canvas = fabricRef.current;
@@ -1839,6 +1933,33 @@ export default function CoverDesignerPage() {
                     <button onClick={() => { const v = selStrokeW + 1; setSelStrokeW(v); applySelProp({ strokeWidth: v }); }}
                       style={S.iconBtn()}><Plus size={12} /></button>
                   </div>
+
+                  {isMseg && (() => {
+                    const sideLabels = ['上', '右', '下', '左'];
+                    const sideBtn = (active: boolean): React.CSSProperties => ({
+                      background: active ? 'var(--accent)' : 'var(--bg)',
+                      color: active ? '#1A1A1A' : 'var(--text)',
+                      border: '1px solid var(--border)', borderRadius: 4,
+                      cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                      padding: 0, width: 28, height: 24,
+                    });
+                    return (
+                      <>
+                        <div style={S.sectionTitle}>角の丸み</div>
+                        <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <button onClick={() => applyMsegRadius(Math.max(0, msegRadius - 2))} style={S.iconBtn()}><Minus size={12} /></button>
+                          <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{msegRadius}</span>
+                          <button onClick={() => applyMsegRadius(msegRadius + 2)} style={S.iconBtn()}><Plus size={12} /></button>
+                        </div>
+                        <div style={S.sectionTitle}>辺の表示</div>
+                        <div style={{ padding: '0 12px 10px', display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 24px)', gap: 2, justifyContent: 'center' }}>
+                          <div /><button onClick={() => toggleMsegSide(0)} style={sideBtn(msegSides[0])}>{sideLabels[0]}</button><div />
+                          <button onClick={() => toggleMsegSide(3)} style={sideBtn(msegSides[3])}>{sideLabels[3]}</button><div /><button onClick={() => toggleMsegSide(1)} style={sideBtn(msegSides[1])}>{sideLabels[1]}</button>
+                          <div /><button onClick={() => toggleMsegSide(2)} style={sideBtn(msegSides[2])}>{sideLabels[2]}</button><div />
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {isRect && (
                     <>

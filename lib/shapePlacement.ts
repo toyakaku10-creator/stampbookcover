@@ -45,6 +45,69 @@ export function buildArcPath(r: number, startDeg: number, endDeg: number): strin
   return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
 }
 
+// ── マルチセグメントGroup生成（辺ごとに独立したLine＋角弧） ──
+export function buildSegmentGroup(
+  fabric: FabricLib,
+  corners: { x: number; y: number }[],
+  radius: number,
+  sidesEnabled: boolean[],
+  stroke: string,
+  strokeWidth: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  groupProps?: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+  const n = corners.length;
+
+  // 各頂点の「入線タンジェント点」と「出線タンジェント点」を計算
+  const entryPts: { x: number; y: number }[] = [];
+  const exitPts:  { x: number; y: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = corners[(i - 1 + n) % n];
+    const curr = corners[i];
+    const next = corners[(i + 1) % n];
+    if (radius > 0) {
+      const toPrev = { x: prev.x - curr.x, y: prev.y - curr.y };
+      const toNext = { x: next.x - curr.x, y: next.y - curr.y };
+      const lenP = Math.sqrt(toPrev.x ** 2 + toPrev.y ** 2);
+      const lenN = Math.sqrt(toNext.x ** 2 + toNext.y ** 2);
+      const r = Math.min(radius, lenP / 2, lenN / 2);
+      entryPts[i] = { x: curr.x + (toPrev.x / lenP) * r, y: curr.y + (toPrev.y / lenP) * r };
+      exitPts[i]  = { x: curr.x + (toNext.x / lenN) * r, y: curr.y + (toNext.y / lenN) * r };
+    } else {
+      entryPts[i] = { ...curr };
+      exitPts[i]  = { ...curr };
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const segs: any[] = [];
+  const baseOpts = { stroke, strokeWidth, strokeUniform: true, fill: 'transparent' as const };
+
+  // 辺セグメント（n本のLine）
+  for (let i = 0; i < n; i++) {
+    const s = exitPts[i], e = entryPts[(i + 1) % n];
+    segs.push(new fabric.Line([s.x, s.y, e.x, e.y], {
+      ...baseOpts, opacity: sidesEnabled[i] ? 1 : 0,
+    }));
+  }
+
+  // 角弧セグメント（radius > 0 のときのみ）
+  if (radius > 0) {
+    for (let i = 0; i < n; i++) {
+      const p1 = entryPts[i], p2 = exitPts[i], cv = corners[i];
+      const prevEdge = (i - 1 + n) % n;
+      const vis = sidesEnabled[prevEdge] && sidesEnabled[i];
+      segs.push(new fabric.Path(
+        `M ${p1.x} ${p1.y} Q ${cv.x} ${cv.y} ${p2.x} ${p2.y}`,
+        { ...baseOpts, opacity: vis ? 1 : 0 },
+      ));
+    }
+  }
+
+  return new fabric.Group(segs, { fill: 'transparent', ...(groupProps ?? {}) });
+}
+
 // ── オブジェクト生成（全ツール共通） ────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: number, cy: number): any {
@@ -58,7 +121,24 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
     return new fabric.Line([cx - 40, cy, cx + 40, cy], { stroke: color, strokeWidth: sw, strokeUniform: true });
   }
   if (toolId === 'rect') {
-    return new fabric.Rect({ ...opts, ...pos, width: 60, height: 60 });
+    const W = 60, H = 60;
+    const rectCorners = [
+      { x: -W / 2, y: -H / 2 }, { x: W / 2, y: -H / 2 },
+      { x: W / 2, y:  H / 2 }, { x: -W / 2, y:  H / 2 },
+    ];
+    const sidesEnabled = [true, true, true, true];
+    const group = buildSegmentGroup(fabric, rectCorners, 0, sidesEnabled, color, sw, {
+      left: cx, top: cy, originX: 'center' as const, originY: 'center' as const,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._shapeType = 'mseg';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._msegCorners = rectCorners;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._msegRadius = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._msegSides = sidesEnabled;
+    return group;
   }
   if (toolId === 'circle') {
     return new fabric.Ellipse({ ...opts, ...pos, rx: 30, ry: 30 });

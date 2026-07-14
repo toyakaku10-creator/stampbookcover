@@ -211,6 +211,8 @@ export default function CoverDesignerPage() {
   const [selRx, setSelRx] = useState(0);
   const [isTrapezoid, setIsTrapezoid] = useState(false);
   const [selTrapRx, setSelTrapRx] = useState(0);
+  const [isRectSides, setIsRectSides] = useState(false);
+  const [rectSides, setRectSides] = useState({ top: true, right: true, bottom: true, left: true });
 
   // 行列数直接指定
   const [cols, setCols] = useState(3);
@@ -311,11 +313,17 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const obj: any = canvas?.getActiveObject();
-    if (!obj) { setHasSelection(false); setIsStamp(false); return; }
+    if (!obj) { setHasSelection(false); setIsStamp(false); setIsRectSides(false); return; }
     setHasSelection(true);
-    setIsStamp(obj.type === 'group');
+    setIsStamp(obj.type === 'group' && obj._shapeType !== 'rect-sides');
     setIsRect(obj.type === 'rect');
+    setIsRectSides(obj._shapeType === 'rect-sides');
     setIsTrapezoid(obj._shapeType === 'trapezoid');
+    if (obj.type === 'rect') {
+      setRectSides({ top: true, right: true, bottom: true, left: true });
+    } else if (obj._shapeType === 'rect-sides') {
+      setRectSides(obj._rectSides ?? { top: true, right: true, bottom: true, left: true });
+    }
     setSelFill(typeof obj.fill === 'string' && obj.fill ? obj.fill : '#000000');
     setSelStroke(typeof obj.stroke === 'string' && obj.stroke ? obj.stroke : '#000000');
     setSelStrokeW(obj.strokeWidth ?? 1);
@@ -960,6 +968,72 @@ export default function CoverDesignerPage() {
     setIsTrapezoid(true);
     saveHistoryRef.current();
   }, []);
+
+  // ── 矩形 辺の表示切替 ──────────────────────────────────────────────
+  const toggleRectSide = useCallback((side: 'top' | 'right' | 'bottom' | 'left') => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const active: any = canvas?.getActiveObject();
+    if (!canvas || !active) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = (canvas as any)._fabric;
+    if (!fabric) return;
+
+    const newSides = { ...rectSides, [side]: !rectSides[side] };
+    setRectSides(newSides);
+
+    let w: number, h: number, stroke: string, strokeWidth: number, opacity: number, angle: number, scaleX: number, scaleY: number;
+    if (active._shapeType === 'rect-sides') {
+      w = active._rectW ?? 60; h = active._rectH ?? 60;
+      stroke = active._rectStroke ?? '#C9A84C'; strokeWidth = active._rectStrokeW ?? 1.5;
+    } else {
+      w = active.width ?? 60; h = active.height ?? 60;
+      stroke = active.stroke ?? '#C9A84C'; strokeWidth = active.strokeWidth ?? 1.5;
+    }
+    angle = active.angle ?? 0; scaleX = active.scaleX ?? 1; scaleY = active.scaleY ?? 1; opacity = active.opacity ?? 1;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const center: { x: number; y: number } = active.getCenterPoint?.() ?? { x: active.left, y: active.top };
+    const hw = w / 2, hh = h / 2;
+    const lineOpts = { stroke, strokeWidth, strokeUniform: true, fill: 'transparent' };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lines: any[] = [];
+    if (newSides.top)    lines.push(new fabric.Line([-hw, -hh,  hw, -hh], lineOpts));
+    if (newSides.right)  lines.push(new fabric.Line([ hw, -hh,  hw,  hh], lineOpts));
+    if (newSides.bottom) lines.push(new fabric.Line([ hw,  hh, -hw,  hh], lineOpts));
+    if (newSides.left)   lines.push(new fabric.Line([-hw,  hh, -hw, -hh], lineOpts));
+
+    if (lines.length === 0) {
+      canvas.remove(active);
+      canvas.renderAll();
+      saveHistoryRef.current();
+      return;
+    }
+
+    const group = new fabric.Group(lines, {
+      left: center.x, top: center.y, originX: 'center', originY: 'center',
+      angle, scaleX, scaleY, opacity,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._shapeType = 'rect-sides';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._rectW = w;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._rectH = h;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._rectStroke = stroke;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._rectStrokeW = strokeWidth;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._rectSides = newSides;
+    canvas.remove(active);
+    canvas.add(group);
+    canvas.setActiveObject(group);
+    canvas.renderAll();
+    setIsRect(false);
+    setIsRectSides(true);
+    saveHistoryRef.current();
+  }, [rectSides]);
 
   // ── プレビュー ────────────────────────────────────────────────────
   const openPreview = useCallback(() => {
@@ -1629,6 +1703,26 @@ export default function CoverDesignerPage() {
                       </div>
                     </>
                   )}
+
+                  {(isRect || isRectSides) && (() => {
+                    const sideBtn = (active: boolean): React.CSSProperties => ({
+                      background: active ? 'var(--accent)' : 'var(--bg)',
+                      color: active ? '#1A1A1A' : 'var(--text)',
+                      border: '1px solid var(--border)', borderRadius: 4,
+                      cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                      padding: 0, width: 28, height: 24,
+                    });
+                    return (
+                      <>
+                        <div style={S.sectionTitle}>辺の表示</div>
+                        <div style={{ padding: '0 12px 10px', display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 24px)', gap: 2, justifyContent: 'center' }}>
+                          <div /><button onClick={() => toggleRectSide('top')} style={sideBtn(rectSides.top)}>上</button><div />
+                          <button onClick={() => toggleRectSide('left')} style={sideBtn(rectSides.left)}>左</button><div /><button onClick={() => toggleRectSide('right')} style={sideBtn(rectSides.right)}>右</button>
+                          <div /><button onClick={() => toggleRectSide('bottom')} style={sideBtn(rectSides.bottom)}>下</button><div />
+                        </div>
+                      </>
+                    );
+                  })()}
                 </>
               )}
 

@@ -195,6 +195,7 @@ export default function StampEditorPage() {
   const [lineCoords, setLineCoords] = useState<{ ax1: number; ay1: number; ax2: number; ay2: number } | null>(null);
   const [selRx, setSelRx] = useState(0);
   const [selTrapRx, setSelTrapRx] = useState(0);
+  const [rectSides, setRectSides] = useState({ top: true, right: true, bottom: true, left: true });
   // カスタム形状の種類
   const [selectedShapeType, setSelectedShapeType] = useState<'trapezoid' | 'arc' | 'dot' | null>(null);
   // 台形プロパティ
@@ -235,7 +236,7 @@ export default function StampEditorPage() {
   // ── 選択オブジェクトからパネルへ同期 ─────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const syncFromObj = useCallback((obj: any) => {
-    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); return; }
+    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); setRectSides({ top: true, right: true, bottom: true, left: true }); return; }
     const props = getEffectiveProps(obj);
     isApplyingFromSelRef.current = true;
     setColor(props.stroke);
@@ -243,8 +244,14 @@ export default function StampEditorPage() {
     setStrokeWidth(props.strokeWidth);
     setCurrentAngle(Math.round(obj.angle ?? 0));
     setHasSelection(true);
-    setSelectedObjType(obj.type ?? '');
+    const isRectSidesGroup = obj._shapeType === 'rect-sides';
+    setSelectedObjType(obj.type === 'rect' ? 'rect' : isRectSidesGroup ? 'rect-sides' : (obj.type ?? ''));
     setSelRx(obj.type === 'rect' ? Math.round(obj.rx ?? 0) : 0);
+    if (obj.type === 'rect') {
+      setRectSides({ top: true, right: true, bottom: true, left: true });
+    } else if (isRectSidesGroup) {
+      setRectSides(obj._rectSides ?? { top: true, right: true, bottom: true, left: true });
+    }
     if (obj.type === 'line') {
       const coords = getLineAbsCoords(obj);
       setLineCoords(coords);
@@ -786,6 +793,58 @@ export default function StampEditorPage() {
     replaceShape(newPath);
   }, [replaceShape]);
 
+  const toggleRectSide = useCallback((side: 'top' | 'right' | 'bottom' | 'left') => {
+    const canvas = fabricRef.current;
+    const old = canvas?.getActiveObject() ?? lastActiveRef.current;
+    if (!canvas || !old) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric = (canvas as any)._fabric;
+    if (!fabric) return;
+
+    const newSides = { ...rectSides, [side]: !rectSides[side] };
+    setRectSides(newSides);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const o = old as any;
+    const isGroup = o._shapeType === 'rect-sides';
+    const w: number = isGroup ? (o._rectW ?? 60) : (o.width ?? 60);
+    const h: number = isGroup ? (o._rectH ?? 60) : (o.height ?? 60);
+    const stroke: string = isGroup ? (o._rectStroke ?? '#C9A84C') : (o.stroke ?? '#C9A84C');
+    const strokeWidth: number = isGroup ? (o._rectStrokeW ?? 1.5) : (o.strokeWidth ?? 1.5);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const center: { x: number; y: number } = (old as any).getCenterPoint?.() ?? { x: old.left, y: old.top };
+    const hw = w / 2, hh = h / 2;
+    const lineOpts = { stroke, strokeWidth, strokeUniform: true, fill: 'transparent' };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const lines: any[] = [];
+    if (newSides.top)    lines.push(new fabric.Line([-hw, -hh,  hw, -hh], lineOpts));
+    if (newSides.right)  lines.push(new fabric.Line([ hw, -hh,  hw,  hh], lineOpts));
+    if (newSides.bottom) lines.push(new fabric.Line([ hw,  hh, -hw,  hh], lineOpts));
+    if (newSides.left)   lines.push(new fabric.Line([-hw,  hh, -hw, -hh], lineOpts));
+
+    if (lines.length === 0) {
+      canvas.remove(old);
+      canvas.renderAll();
+      saveHistoryRef.current();
+      return;
+    }
+
+    const group = new fabric.Group(lines, {
+      left: center.x, top: center.y, originX: 'center', originY: 'center',
+      angle: old.angle ?? 0, scaleX: old.scaleX ?? 1, scaleY: old.scaleY ?? 1, opacity: old.opacity ?? 1,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._shapeType = 'rect-sides';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._rectW = w; (group as any)._rectH = h;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._rectStroke = stroke; (group as any)._rectStrokeW = strokeWidth;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._rectSides = newSides;
+    setSelectedObjType('rect-sides');
+    replaceShape(group);
+  }, [rectSides, replaceShape]);
+
   const applyArcProps = useCallback((r: number, startDeg: number, endDeg: number) => {
     const canvas = fabricRef.current;
     const old = canvas?.getActiveObject() ?? lastActiveRef.current;
@@ -1309,6 +1368,27 @@ export default function StampEditorPage() {
                   </div>
                 </div>
               )}
+
+              {/* 辺の表示切替（矩形・rect-sides選択時のみ） */}
+              {(selectedObjType === 'rect' || selectedObjType === 'rect-sides') && (() => {
+                const sideBtn = (active: boolean): React.CSSProperties => ({
+                  background: active ? 'var(--accent)' : 'var(--bg)',
+                  color: active ? '#1A1A1A' : 'var(--text)',
+                  border: '1px solid var(--border)', borderRadius: 4,
+                  cursor: 'pointer', fontSize: 10, fontWeight: 600,
+                  padding: 0, width: 28, height: 24,
+                });
+                return (
+                  <div>
+                    <div style={S.label}>辺の表示</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 24px)', gap: 2, justifyContent: 'center' }}>
+                      <div /><button onClick={() => toggleRectSide('top')} style={sideBtn(rectSides.top)}>上</button><div />
+                      <button onClick={() => toggleRectSide('left')} style={sideBtn(rectSides.left)}>左</button><div /><button onClick={() => toggleRectSide('right')} style={sideBtn(rectSides.right)}>右</button>
+                      <div /><button onClick={() => toggleRectSide('bottom')} style={sideBtn(rectSides.bottom)}>下</button><div />
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* 直線端点編集（直線選択時のみ） */}
               {selectedObjType === 'line' && lineCoords !== null && (

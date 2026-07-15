@@ -946,7 +946,7 @@ export default function CoverDesignerPage() {
     let thumbnail = '';
     try {
       const thumbEl = document.createElement('canvas');
-      const thumbCanvas: any = new fabric.Canvas(thumbEl, { width: 200, height: 200, backgroundColor: '#ffffff' });
+      const thumbCanvas: any = new fabric.StaticCanvas(thumbEl, { width: 200, height: 200, backgroundColor: '#ffffff' });
       const group = new fabric.Group(cloned);
       const w = group.getScaledWidth?.() ?? group.width ?? 1;
       const h = group.getScaledHeight?.() ?? group.height ?? 1;

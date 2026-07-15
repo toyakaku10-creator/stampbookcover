@@ -323,7 +323,7 @@ export default function CoverDesignerPage() {
     const obj: any = canvas?.getActiveObject();
     if (!obj) { setHasSelection(false); setIsStamp(false); setIsRectSides(false); setIsFourSidedPoly(false); setShowTriSideToggle(false); setTriSides({ s0: true, s1: true, s2: true }); setIsMseg(false); return; }
     setHasSelection(true);
-    setIsStamp(obj.type === 'group' && obj._shapeType !== 'rect-sides' && obj._shapeType !== 'tri-sides' && obj._shapeType !== 'mseg');
+    setIsStamp(obj.type === 'group' && obj._shapeType !== 'rect-sides' && obj._shapeType !== 'tri-sides' && !obj._msegCorners);
     setIsRect(obj.type === 'rect');
     setIsRectSides(obj._shapeType === 'rect-sides');
     const poly4 = obj.type === 'polygon' && (obj.points?.length ?? 0) === 4;
@@ -331,7 +331,7 @@ export default function CoverDesignerPage() {
     setIsTrapezoid(obj._shapeType === 'trapezoid');
     setIsDiamond(obj._shapeType === 'h-diamond');
     setIsTriangle(obj._shapeType === 'triangle');
-    const isMsegObj = obj._shapeType === 'mseg';
+    const isMsegObj = !!obj._msegCorners;
     setIsMseg(isMsegObj);
     if (isMsegObj) {
       setMsegRadius(obj._msegRadius ?? 0);
@@ -355,7 +355,7 @@ export default function CoverDesignerPage() {
     setSelAngle(Math.round(obj.angle ?? 0));
     setSelSize(Math.round(Math.max(obj.getScaledWidth?.() ?? 0, obj.getScaledHeight?.() ?? 0)));
     setSelRx(Math.round(obj.rx ?? 0));
-    setSelTrapRx(obj._shapeType === 'trapezoid' ? Math.round(obj._trapRadius ?? 0) : obj._shapeType === 'h-diamond' ? Math.round(obj._diamondRadius ?? 0) : obj._shapeType === 'triangle' ? Math.round(obj._triangleRadius ?? 0) : 0);
+    setSelTrapRx(obj._shapeType === 'trapezoid' ? Math.round(obj._msegRadius ?? obj._trapRadius ?? 0) : obj._shapeType === 'h-diamond' ? Math.round(obj._diamondRadius ?? 0) : obj._shapeType === 'triangle' ? Math.round(obj._triangleRadius ?? 0) : 0);
   }, []);
 
   const updateSelPropsRef = useRef(updateSelProps);
@@ -367,7 +367,7 @@ export default function CoverDesignerPage() {
     if (!obj || !canvas) return;
     obj.set(props);
     // mseg グループはストローク関連プロパティを子に伝播
-    if ((obj as any)._shapeType === 'mseg') {
+    if (!!(obj as any)._msegCorners) {
       const strokeProps: Record<string, unknown> = {};
       if ('stroke'      in (props as any)) strokeProps.stroke      = (props as any).stroke;
       if ('strokeWidth' in (props as any)) strokeProps.strokeWidth = (props as any).strokeWidth;
@@ -962,7 +962,7 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const old: any = canvas?.getActiveObject();
-    if (!canvas || !old || old._shapeType !== 'trapezoid') return;
+    if (!canvas || !old || old._shapeType !== 'trapezoid' || old._msegCorners) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mod: any = await import('fabric');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1159,7 +1159,7 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const old: any = canvas?.getActiveObject();
-    if (!canvas || !old || old._shapeType !== 'mseg') return;
+    if (!canvas || !old || !old._msegCorners) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabric: any = (canvas as any)._fabric;
     if (!fabric) return;
@@ -1176,13 +1176,21 @@ export default function CoverDesignerPage() {
       originX: old.originX ?? 'left', originY: old.originY ?? 'top',
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (newGroup as any)._shapeType   = 'mseg';
+    (newGroup as any)._shapeType   = old._shapeType;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegCorners = corners;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegRadius  = radius;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegSides   = sides;
+    if (old._trapTop !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapTop    = old._trapTop;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapBottom = old._trapBottom;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapHeight = old._trapHeight;
+    }
     canvas.remove(old);
     canvas.add(newGroup);
     canvas.setActiveObject(newGroup);
@@ -1196,7 +1204,7 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const old: any = canvas?.getActiveObject();
-    if (!canvas || !old || old._shapeType !== 'mseg') return;
+    if (!canvas || !old || !old._msegCorners) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabric: any = (canvas as any)._fabric;
     if (!fabric) return;
@@ -1215,13 +1223,21 @@ export default function CoverDesignerPage() {
       originX: old.originX ?? 'left', originY: old.originY ?? 'top',
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (newGroup as any)._shapeType   = 'mseg';
+    (newGroup as any)._shapeType   = old._shapeType;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegCorners = corners;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegRadius  = radius;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegSides   = newSides;
+    if (old._trapTop !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapTop    = old._trapTop;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapBottom = old._trapBottom;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapHeight = old._trapHeight;
+    }
     canvas.remove(old);
     canvas.add(newGroup);
     canvas.setActiveObject(newGroup);
@@ -1982,7 +1998,7 @@ export default function CoverDesignerPage() {
                     </>
                   )}
 
-                  {isTrapezoid && (
+                  {isTrapezoid && !isMseg && (
                     <>
                       <div style={S.sectionTitle}>角の丸み</div>
                       <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>

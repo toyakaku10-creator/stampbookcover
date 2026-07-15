@@ -201,6 +201,7 @@ export default function StampEditorPage() {
   const [triSides, setTriSides] = useState({ s0: true, s1: true, s2: true });
   // カスタム形状の種類
   const [selectedShapeType, setSelectedShapeType] = useState<'trapezoid' | 'arc' | 'dot' | 'h-diamond' | 'triangle' | 'mseg' | null>(null);
+  const [isMseg, setIsMseg] = useState(false);
   const [msegRadius, setMsegRadius] = useState(0);
   const [msegSides, setMsegSides] = useState([true, true, true, true]);
   // 台形プロパティ
@@ -241,7 +242,7 @@ export default function StampEditorPage() {
   // ── 選択オブジェクトからパネルへ同期 ─────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const syncFromObj = useCallback((obj: any) => {
-    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); setRectSides({ top: true, right: true, bottom: true, left: true }); setShowSideToggle(false); setShowTriSideToggle(false); setTriSides({ s0: true, s1: true, s2: true }); setMsegRadius(0); setMsegSides([true, true, true, true]); return; }
+    if (!obj) { setHasSelection(false); setSelectedObjType(''); setLineCoords(null); setSelRx(0); setSelTrapRx(0); setRectSides({ top: true, right: true, bottom: true, left: true }); setShowSideToggle(false); setShowTriSideToggle(false); setTriSides({ s0: true, s1: true, s2: true }); setIsMseg(false); setMsegRadius(0); setMsegSides([true, true, true, true]); return; }
     const props = getEffectiveProps(obj);
     isApplyingFromSelRef.current = true;
     setColor(props.stroke);
@@ -273,16 +274,20 @@ export default function StampEditorPage() {
     }
     // カスタム形状
     const st = obj._shapeType as 'trapezoid' | 'arc' | 'dot' | 'h-diamond' | 'triangle' | 'mseg' | undefined;
-    if (st === 'mseg') {
-      setSelectedShapeType('mseg');
+    const hasMseg = !!(obj._msegCorners);
+    setIsMseg(hasMseg);
+    if (hasMseg || st === 'mseg') {
       setMsegRadius((obj._msegRadius as number) ?? 0);
       setMsegSides([...((obj._msegSides as boolean[]) ?? [true, true, true, true])]);
+    }
+    if (st === 'mseg') {
+      setSelectedShapeType('mseg');
     } else if (st === 'trapezoid') {
       setSelectedShapeType('trapezoid');
       setTrapTop(obj._trapTop ?? 60);
       setTrapBottom(obj._trapBottom ?? 90);
       setTrapHeight(obj._trapHeight ?? 50);
-      setSelTrapRx(obj._trapRadius ?? 0);
+      if (!hasMseg) setSelTrapRx(obj._trapRadius ?? 0);
     } else if (st === 'h-diamond') {
       setSelectedShapeType('h-diamond');
       setSelTrapRx(obj._diamondRadius ?? 0);
@@ -769,6 +774,34 @@ export default function StampEditorPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabric = (canvas as any)._fabric;
     if (!fabric) return;
+    if ((old as any)._msegCorners) {
+      // mseg 方式で再構築
+      const corners = [
+        { x: -topW / 2, y: -h / 2 }, { x: topW / 2, y: -h / 2 },
+        { x: botW / 2, y:  h / 2 }, { x: -botW / 2, y:  h / 2 },
+      ];
+      const radius = (old as any)._msegRadius ?? 0;
+      const sides  = (old as any)._msegSides  ?? [true, true, true, true];
+      const children = (old as any).getObjects?.() ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const firstChild: any = children[0];
+      const stroke = firstChild?.stroke ?? '#C9A84C';
+      const sw     = firstChild?.strokeWidth ?? 1.5;
+      const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, {
+        left: old.left, top: old.top, angle: old.angle,
+        scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
+        originX: old.originX, originY: old.originY,
+      });
+      (newGroup as any)._shapeType   = 'trapezoid';
+      (newGroup as any)._msegCorners = corners;
+      (newGroup as any)._msegRadius  = radius;
+      (newGroup as any)._msegSides   = sides;
+      (newGroup as any)._trapTop     = topW;
+      (newGroup as any)._trapBottom  = botW;
+      (newGroup as any)._trapHeight  = h;
+      replaceShape(newGroup);
+      return;
+    }
     const half = (botW - topW) / 2;
     const poly = new fabric.Polygon(
       [{ x: half, y: 0 }, { x: half + topW, y: 0 }, { x: botW, y: h }, { x: 0, y: h }],
@@ -791,7 +824,7 @@ export default function StampEditorPage() {
   const applyTrapezoidRadius = useCallback((radius: number) => {
     const canvas = fabricRef.current;
     const old = canvas?.getActiveObject() ?? lastActiveRef.current;
-    if (!canvas || !old || (old as any)._shapeType !== 'trapezoid') return;
+    if (!canvas || !old || (old as any)._shapeType !== 'trapezoid' || (old as any)._msegCorners) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabric = (canvas as any)._fabric;
     if (!fabric) return;
@@ -881,7 +914,7 @@ export default function StampEditorPage() {
   const applyMsegRadius = useCallback((radius: number) => {
     const canvas = fabricRef.current;
     const old = canvas?.getActiveObject() ?? lastActiveRef.current;
-    if (!canvas || !old || (old as any)._shapeType !== 'mseg') return;
+    if (!canvas || !old || !(old as any)._msegCorners) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabric = (canvas as any)._fabric;
     if (!fabric) return;
@@ -898,13 +931,21 @@ export default function StampEditorPage() {
       originX: old.originX, originY: old.originY,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (newGroup as any)._shapeType   = 'mseg';
+    (newGroup as any)._shapeType   = (old as any)._shapeType;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegCorners = corners;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegRadius  = radius;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegSides   = sides;
+    if ((old as any)._trapTop !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapTop    = (old as any)._trapTop;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapBottom = (old as any)._trapBottom;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapHeight = (old as any)._trapHeight;
+    }
     setMsegRadius(radius);
     replaceShape(newGroup);
   }, [replaceShape]);
@@ -912,7 +953,7 @@ export default function StampEditorPage() {
   const toggleMsegSide = useCallback((idx: number) => {
     const canvas = fabricRef.current;
     const old = canvas?.getActiveObject() ?? lastActiveRef.current;
-    if (!canvas || !old || (old as any)._shapeType !== 'mseg') return;
+    if (!canvas || !old || !(old as any)._msegCorners) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabric = (canvas as any)._fabric;
     if (!fabric) return;
@@ -931,13 +972,21 @@ export default function StampEditorPage() {
       originX: old.originX, originY: old.originY,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (newGroup as any)._shapeType   = 'mseg';
+    (newGroup as any)._shapeType   = (old as any)._shapeType;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegCorners = corners;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegRadius  = radius;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newGroup as any)._msegSides   = newSides;
+    if ((old as any)._trapTop !== undefined) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapTop    = (old as any)._trapTop;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapBottom = (old as any)._trapBottom;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._trapHeight = (old as any)._trapHeight;
+    }
     setMsegSides(newSides);
     replaceShape(newGroup);
   }, [replaceShape]);
@@ -1447,7 +1496,7 @@ export default function StampEditorPage() {
           )}
 
           {/* ── mseg（矩形マルチセグメント）プロパティ ──────── */}
-          {selectedShapeType === 'mseg' && (() => {
+          {(selectedShapeType === 'mseg' || isMseg) && (() => {
             const sideLabels = ['上', '右', '下', '左'];
             const sideBtn = (active: boolean): React.CSSProperties => ({
               background: active ? 'var(--accent)' : 'var(--bg)',
@@ -1528,12 +1577,14 @@ export default function StampEditorPage() {
                     <span style={{ fontSize: 11, color: '#888' }}>px</span>
                   </div>
                 ))}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                  <span style={{ fontSize: 11, color: '#888', width: 26 }}>丸み</span>
-                  <button onClick={() => applyTrapezoidRadius(Math.max(0, selTrapRx - 2))} style={S.actionBtn()}><Minus size={12} /></button>
-                  <span style={{ flex: 1, textAlign: 'center', fontSize: 12, color: 'var(--text)' }}>{selTrapRx}</span>
-                  <button onClick={() => applyTrapezoidRadius(selTrapRx + 2)} style={S.actionBtn()}><Plus size={12} /></button>
-                </div>
+                {!isMseg && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                    <span style={{ fontSize: 11, color: '#888', width: 26 }}>丸み</span>
+                    <button onClick={() => applyTrapezoidRadius(Math.max(0, selTrapRx - 2))} style={S.actionBtn()}><Minus size={12} /></button>
+                    <span style={{ flex: 1, textAlign: 'center', fontSize: 12, color: 'var(--text)' }}>{selTrapRx}</span>
+                    <button onClick={() => applyTrapezoidRadius(selTrapRx + 2)} style={S.actionBtn()}><Plus size={12} /></button>
+                  </div>
+                )}
               </div>
             </>
           )}

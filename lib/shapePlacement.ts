@@ -192,24 +192,29 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
   }
   if (toolId === 'trapezoid') {
     const topW = 60, botW = 90, h = 50;
-    const half = (botW - topW) / 2;
-    const poly = new fabric.Polygon(
-      [{ x: half, y: 0 }, { x: half + topW, y: 0 }, { x: botW, y: h }, { x: 0, y: h }],
-      { ...opts, left: cx - botW / 2, top: cy - h / 2 },
-    );
+    const corners = [
+      { x: -topW / 2, y: -h / 2 }, { x: topW / 2, y: -h / 2 },
+      { x: botW / 2, y:  h / 2 }, { x: -botW / 2, y:  h / 2 },
+    ];
+    const sidesEnabled = [true, true, true, true];
+    const group = buildSegmentGroup(fabric, corners, 0, sidesEnabled, color, sw, {
+      left: cx, top: cy, originX: 'center' as const, originY: 'center' as const,
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._shapeType = 'trapezoid';
+    (group as any)._shapeType   = 'trapezoid';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._trapTop = topW;
+    (group as any)._msegCorners = corners;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._trapBottom = botW;
+    (group as any)._msegRadius  = 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._trapHeight = h;
+    (group as any)._msegSides   = sidesEnabled;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._trapPoints = [{ x: half, y: 0 }, { x: half + topW, y: 0 }, { x: botW, y: h }, { x: 0, y: h }];
+    (group as any)._trapTop     = topW;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._trapRadius = 0;
-    return poly;
+    (group as any)._trapBottom  = botW;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._trapHeight  = h;
+    return group;
   }
   if (toolId === 'arc') {
     const r = 45, startDeg = 180, endDeg = 0;

@@ -53,6 +53,7 @@ export function buildSegmentGroup(
   sidesEnabled: boolean[],
   stroke: string,
   strokeWidth: number,
+  fill: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   groupProps?: Record<string, any>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,12 +85,28 @@ export function buildSegmentGroup(
   const segs: any[] = [];
   const baseOpts = { stroke, strokeWidth, strokeUniform: true, fill: 'transparent' as const };
 
+  // 塗りつぶし専用Polygon（index 0、辺の表示に影響しない）
+  const fillPoly = new fabric.Polygon([...corners], {
+    fill: fill || 'transparent',
+    stroke: 'transparent',
+    strokeWidth: 0,
+    strokeUniform: true,
+    selectable: false,
+    evented: false,
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (fillPoly as any)._isFillShape = true;
+  segs.push(fillPoly);
+
   // 辺セグメント（n本のLine）
   for (let i = 0; i < n; i++) {
     const s = exitPts[i], e = entryPts[(i + 1) % n];
-    segs.push(new fabric.Line([s.x, s.y, e.x, e.y], {
+    const line = new fabric.Line([s.x, s.y, e.x, e.y], {
       ...baseOpts, opacity: sidesEnabled[i] ? 1 : 0,
-    }));
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (line as any)._msegChild = true;
+    segs.push(line);
   }
 
   // 角弧セグメント（radius > 0 のときのみ）
@@ -98,10 +115,13 @@ export function buildSegmentGroup(
       const p1 = entryPts[i], p2 = exitPts[i], cv = corners[i];
       const prevEdge = (i - 1 + n) % n;
       const vis = sidesEnabled[prevEdge] && sidesEnabled[i];
-      segs.push(new fabric.Path(
+      const arc = new fabric.Path(
         `M ${p1.x} ${p1.y} Q ${cv.x} ${cv.y} ${p2.x} ${p2.y}`,
         { ...baseOpts, opacity: vis ? 1 : 0 },
-      ));
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (arc as any)._msegChild = true;
+      segs.push(arc);
     }
   }
 
@@ -127,7 +147,7 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
       { x: W / 2, y:  H / 2 }, { x: -W / 2, y:  H / 2 },
     ];
     const sidesEnabled = [true, true, true, true];
-    const group = buildSegmentGroup(fabric, rectCorners, 0, sidesEnabled, color, sw, {
+    const group = buildSegmentGroup(fabric, rectCorners, 0, sidesEnabled, color, sw, fill, {
       left: cx, top: cy, originX: 'center' as const, originY: 'center' as const,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -153,7 +173,7 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
       { x:  SIDE / 2, y: HEIGHT / 2 },
     ];
     const sidesEnabled = [true, true, true];
-    const group = buildSegmentGroup(fabric, corners, 0, sidesEnabled, color, sw, {
+    const group = buildSegmentGroup(fabric, corners, 0, sidesEnabled, color, sw, fill, {
       left: cx, top: cy, originX: 'center' as const, originY: 'center' as const,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -198,7 +218,7 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
       { x: -W / 2, y:     0 },
     ];
     const sidesEnabled = [true, true, true, true];
-    const group = buildSegmentGroup(fabric, corners, 0, sidesEnabled, color, sw, {
+    const group = buildSegmentGroup(fabric, corners, 0, sidesEnabled, color, sw, fill, {
       left: cx, top: cy, originX: 'center' as const, originY: 'center' as const,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -218,7 +238,7 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
       { x: botW / 2, y:  h / 2 }, { x: -botW / 2, y:  h / 2 },
     ];
     const sidesEnabled = [true, true, true, true];
-    const group = buildSegmentGroup(fabric, corners, 0, sidesEnabled, color, sw, {
+    const group = buildSegmentGroup(fabric, corners, 0, sidesEnabled, color, sw, fill, {
       left: cx, top: cy, originX: 'center' as const, originY: 'center' as const,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

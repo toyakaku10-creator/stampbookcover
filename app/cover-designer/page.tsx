@@ -336,6 +336,8 @@ export default function CoverDesignerPage() {
     if (isMsegObj) {
       setMsegRadius(obj._msegRadius ?? 0);
       setMsegSides([...((obj._msegSides as boolean[]) ?? [true, true, true, true])]);
+      const fillChild = obj.getObjects?.()?.find((c: any) => c._isFillShape);
+      if (fillChild) setSelFill(fillChild.fill ?? 'transparent');
     }
     const isTriPoly = obj._shapeType === 'triangle' && obj.type === 'polygon';
     const isTriSides = obj._shapeType === 'tri-sides';
@@ -366,13 +368,18 @@ export default function CoverDesignerPage() {
     const obj = canvas?.getActiveObject();
     if (!obj || !canvas) return;
     obj.set(props);
-    // mseg グループはストローク関連プロパティを子に伝播
+    // mseg グループはプロパティを子に選択的に伝播
     if (!!(obj as any)._msegCorners) {
+      const children: any[] = (obj as any).getObjects?.() ?? [];
       const strokeProps: Record<string, unknown> = {};
       if ('stroke'      in (props as any)) strokeProps.stroke      = (props as any).stroke;
       if ('strokeWidth' in (props as any)) strokeProps.strokeWidth = (props as any).strokeWidth;
       if (Object.keys(strokeProps).length > 0) {
-        (obj as any).getObjects?.()?.forEach((child: any) => child.set(strokeProps));
+        children.forEach((child: any) => { if (!child._isFillShape) child.set(strokeProps); });
+      }
+      if ('fill' in (props as any)) {
+        const fillChild = children.find((c: any) => c._isFillShape);
+        if (fillChild) fillChild.set({ fill: (props as any).fill });
       }
     }
     canvas.renderAll();
@@ -1165,12 +1172,13 @@ export default function CoverDesignerPage() {
     if (!fabric) return;
     const corners = old._msegCorners as { x: number; y: number }[];
     const sides   = old._msegSides   as boolean[];
-    const children = old.getObjects?.() ?? [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const firstChild: any = children[0];
-    const stroke = firstChild?.stroke ?? '#C9A84C';
-    const sw     = firstChild?.strokeWidth ?? 1.5;
-    const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, {
+    const children: any[] = old.getObjects?.() ?? [];
+    const fillChild  = children.find((c: any) => c._isFillShape);
+    const strokeChild = children.find((c: any) => !c._isFillShape);
+    const fill   = fillChild?.fill   ?? 'transparent';
+    const stroke = strokeChild?.stroke      ?? '#C9A84C';
+    const sw     = strokeChild?.strokeWidth ?? 1.5;
+    const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, fill, {
       left: old.left, top: old.top, angle: old.angle ?? 0,
       scaleX: old.scaleX ?? 1, scaleY: old.scaleY ?? 1, opacity: old.opacity ?? 1,
       originX: old.originX ?? 'left', originY: old.originY ?? 'top',
@@ -1212,12 +1220,13 @@ export default function CoverDesignerPage() {
     const radius  = old._msegRadius  as number ?? 0;
     const newSides = [...(old._msegSides as boolean[])];
     newSides[idx] = !newSides[idx];
-    const children = old.getObjects?.() ?? [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const firstChild: any = children[0];
-    const stroke = firstChild?.stroke ?? '#C9A84C';
-    const sw     = firstChild?.strokeWidth ?? 1.5;
-    const newGroup = buildSegmentGroup(fabric, corners, radius, newSides, stroke, sw, {
+    const children: any[] = old.getObjects?.() ?? [];
+    const fillChild  = children.find((c: any) => c._isFillShape);
+    const strokeChild = children.find((c: any) => !c._isFillShape);
+    const fill   = fillChild?.fill   ?? 'transparent';
+    const stroke = strokeChild?.stroke      ?? '#C9A84C';
+    const sw     = strokeChild?.strokeWidth ?? 1.5;
+    const newGroup = buildSegmentGroup(fabric, corners, radius, newSides, stroke, sw, fill, {
       left: old.left, top: old.top, angle: old.angle ?? 0,
       scaleX: old.scaleX ?? 1, scaleY: old.scaleY ?? 1, opacity: old.opacity ?? 1,
       originX: old.originX ?? 'left', originY: old.originY ?? 'top',

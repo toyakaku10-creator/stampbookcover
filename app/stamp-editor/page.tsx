@@ -73,7 +73,19 @@ const TOOLS: { id: Tool; icon: React.ReactNode; title: string }[] = [
 // ── 選択オブジェクトの有効プロパティを取得 ──────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getEffectiveProps(obj: any) {
-  // Group の場合は最初の子から色プロパティを読む
+  // mseg グループ: fill子とstroke子を区別して読む
+  if (obj?.type === 'group' && obj._msegCorners) {
+    const children: any[] = obj.getObjects?.() ?? [];
+    const fillChild   = children.find((c: any) => c._isFillShape);
+    const strokeChild = children.find((c: any) => !c._isFillShape);
+    const rawFill = fillChild?.fill;
+    return {
+      stroke:      strokeChild?.stroke ?? GOLD,
+      fill:        (!rawFill || rawFill === 'transparent') ? 'transparent' : rawFill as string,
+      strokeWidth: strokeChild?.strokeWidth ?? 1.5,
+    };
+  }
+  // 通常グループは最初の子から読む
   let ref = obj;
   if (obj?.type === 'group') {
     const children = obj.getObjects?.() ?? [];
@@ -702,6 +714,10 @@ export default function StampEditorPage() {
     const applyDeep = (o: any) => {
       if (o.type === 'group') {
         o.getObjects?.()?.forEach(applyDeep);
+      } else if (o._isFillShape) {
+        o.set({ fill }); // mseg塗りつぶし専用Polygon: fillのみ更新
+      } else if (o._msegChild) {
+        o.set({ stroke: color, strokeWidth }); // mseg辺セグメント: strokeのみ更新
       } else {
         o.set({ stroke: color, fill, strokeWidth });
       }
@@ -782,12 +798,13 @@ export default function StampEditorPage() {
       ];
       const radius = (old as any)._msegRadius ?? 0;
       const sides  = (old as any)._msegSides  ?? [true, true, true, true];
-      const children = (old as any).getObjects?.() ?? [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const firstChild: any = children[0];
-      const stroke = firstChild?.stroke ?? '#C9A84C';
-      const sw     = firstChild?.strokeWidth ?? 1.5;
-      const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, {
+      const children: any[] = (old as any).getObjects?.() ?? [];
+      const fillChild   = children.find((c: any) => c._isFillShape);
+      const strokeChild = children.find((c: any) => !c._isFillShape);
+      const fill   = fillChild?.fill   ?? 'transparent';
+      const stroke = strokeChild?.stroke      ?? '#C9A84C';
+      const sw     = strokeChild?.strokeWidth ?? 1.5;
+      const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, fill, {
         left: old.left, top: old.top, angle: old.angle,
         scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
         originX: old.originX, originY: old.originY,
@@ -920,12 +937,13 @@ export default function StampEditorPage() {
     if (!fabric) return;
     const corners = (old as any)._msegCorners as { x: number; y: number }[];
     const sides   = (old as any)._msegSides   as boolean[];
-    const children = (old as any).getObjects?.() ?? [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const firstChild: any = children[0];
-    const stroke = firstChild?.stroke ?? '#C9A84C';
-    const sw     = firstChild?.strokeWidth ?? 1.5;
-    const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, {
+    const children: any[] = (old as any).getObjects?.() ?? [];
+    const fillChild   = children.find((c: any) => c._isFillShape);
+    const strokeChild = children.find((c: any) => !c._isFillShape);
+    const fill   = fillChild?.fill   ?? 'transparent';
+    const stroke = strokeChild?.stroke      ?? '#C9A84C';
+    const sw     = strokeChild?.strokeWidth ?? 1.5;
+    const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, fill, {
       left: old.left, top: old.top, angle: old.angle,
       scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
       originX: old.originX, originY: old.originY,
@@ -961,12 +979,13 @@ export default function StampEditorPage() {
     const radius  = ((old as any)._msegRadius as number) ?? 0;
     const newSides = [...((old as any)._msegSides as boolean[])];
     newSides[idx] = !newSides[idx];
-    const children = (old as any).getObjects?.() ?? [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const firstChild: any = children[0];
-    const stroke = firstChild?.stroke ?? '#C9A84C';
-    const sw     = firstChild?.strokeWidth ?? 1.5;
-    const newGroup = buildSegmentGroup(fabric, corners, radius, newSides, stroke, sw, {
+    const children: any[] = (old as any).getObjects?.() ?? [];
+    const fillChild   = children.find((c: any) => c._isFillShape);
+    const strokeChild = children.find((c: any) => !c._isFillShape);
+    const fill   = fillChild?.fill   ?? 'transparent';
+    const stroke = strokeChild?.stroke      ?? '#C9A84C';
+    const sw     = strokeChild?.strokeWidth ?? 1.5;
+    const newGroup = buildSegmentGroup(fabric, corners, radius, newSides, stroke, sw, fill, {
       left: old.left, top: old.top, angle: old.angle,
       scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
       originX: old.originX, originY: old.originY,

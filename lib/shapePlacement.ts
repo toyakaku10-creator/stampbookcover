@@ -146,15 +146,25 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
   if (toolId === 'triangle') {
     const SIDE = 80;
     const HEIGHT = Math.round(SIDE * (Math.sqrt(3) / 2));
-    const triPts = [{ x: SIDE / 2, y: 0 }, { x: SIDE, y: HEIGHT }, { x: 0, y: HEIGHT }];
-    const poly = new fabric.Polygon(triPts, { ...opts, left: cx - SIDE / 2, top: cy - HEIGHT / 2 });
+    // 中心原点・頂点順: 上→左下→右下（辺0=左辺、辺1=底辺、辺2=右辺）
+    const corners = [
+      { x: 0, y: -HEIGHT / 2 },
+      { x: -SIDE / 2, y: HEIGHT / 2 },
+      { x:  SIDE / 2, y: HEIGHT / 2 },
+    ];
+    const sidesEnabled = [true, true, true];
+    const group = buildSegmentGroup(fabric, corners, 0, sidesEnabled, color, sw, {
+      left: cx, top: cy, originX: 'center' as const, originY: 'center' as const,
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._shapeType = 'triangle';
+    (group as any)._shapeType   = 'triangle';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._trianglePoints = triPts;
+    (group as any)._msegCorners = corners;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._triangleRadius = 0;
-    return poly;
+    (group as any)._msegRadius  = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._msegSides   = sidesEnabled;
+    return group;
   }
 
   if (toolId === 'polygon') {
@@ -180,15 +190,26 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
   }
   if (toolId === 'h-diamond') {
     const W = 60, H = Math.round(W * Math.sqrt(3));
-    const diamondPts = [{ x: W / 2, y: 0 }, { x: W, y: H / 2 }, { x: W / 2, y: H }, { x: 0, y: H / 2 }];
-    const poly = new fabric.Polygon(diamondPts, { ...opts, left: cx - W / 2, top: cy - H / 2 });
+    // 中心原点・頂点順: 上→右→下→左（辺0=右上、辺1=右下、辺2=左下、辺3=左上）
+    const corners = [
+      { x:     0, y: -H / 2 },
+      { x:  W / 2, y:     0 },
+      { x:     0, y:  H / 2 },
+      { x: -W / 2, y:     0 },
+    ];
+    const sidesEnabled = [true, true, true, true];
+    const group = buildSegmentGroup(fabric, corners, 0, sidesEnabled, color, sw, {
+      left: cx, top: cy, originX: 'center' as const, originY: 'center' as const,
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._shapeType = 'h-diamond';
+    (group as any)._shapeType   = 'h-diamond';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._diamondPoints = diamondPts;
+    (group as any)._msegCorners = corners;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (poly as any)._diamondRadius = 0;
-    return poly;
+    (group as any)._msegRadius  = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (group as any)._msegSides   = sidesEnabled;
+    return group;
   }
   if (toolId === 'trapezoid') {
     const topW = 60, botW = 90, h = 50;

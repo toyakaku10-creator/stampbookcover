@@ -1007,7 +1007,7 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const old: any = canvas?.getActiveObject();
-    if (!canvas || !old || old._shapeType !== 'h-diamond') return;
+    if (!canvas || !old || old._shapeType !== 'h-diamond' || old._msegCorners) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mod: any = await import('fabric');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1043,7 +1043,7 @@ export default function CoverDesignerPage() {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const old: any = canvas?.getActiveObject();
-    if (!canvas || !old || old._shapeType !== 'triangle') return;
+    if (!canvas || !old || old._shapeType !== 'triangle' || old._msegCorners) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mod: any = await import('fabric');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1951,7 +1951,6 @@ export default function CoverDesignerPage() {
                   </div>
 
                   {isMseg && (() => {
-                    const sideLabels = ['上', '右', '下', '左'];
                     const sideBtn = (active: boolean): React.CSSProperties => ({
                       background: active ? 'var(--accent)' : 'var(--bg)',
                       color: active ? '#1A1A1A' : 'var(--text)',
@@ -1959,6 +1958,7 @@ export default function CoverDesignerPage() {
                       cursor: 'pointer', fontSize: 10, fontWeight: 600,
                       padding: 0, width: 28, height: 24,
                     });
+                    const isTriMseg = msegSides.length === 3;
                     return (
                       <>
                         <div style={S.sectionTitle}>角の丸み</div>
@@ -1968,11 +1968,19 @@ export default function CoverDesignerPage() {
                           <button onClick={() => applyMsegRadius(msegRadius + 2)} style={S.iconBtn()}><Plus size={12} /></button>
                         </div>
                         <div style={S.sectionTitle}>辺の表示</div>
-                        <div style={{ padding: '0 12px 10px', display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 24px)', gap: 2, justifyContent: 'center' }}>
-                          <div /><button onClick={() => toggleMsegSide(0)} style={sideBtn(msegSides[0])}>{sideLabels[0]}</button><div />
-                          <button onClick={() => toggleMsegSide(3)} style={sideBtn(msegSides[3])}>{sideLabels[3]}</button><div /><button onClick={() => toggleMsegSide(1)} style={sideBtn(msegSides[1])}>{sideLabels[1]}</button>
-                          <div /><button onClick={() => toggleMsegSide(2)} style={sideBtn(msegSides[2])}>{sideLabels[2]}</button><div />
-                        </div>
+                        {isTriMseg ? (
+                          <div style={{ padding: '0 12px 10px', display: 'flex', gap: 4, justifyContent: 'center' }}>
+                            <button onClick={() => toggleMsegSide(0)} style={sideBtn(msegSides[0])}>左</button>
+                            <button onClick={() => toggleMsegSide(1)} style={sideBtn(msegSides[1])}>底</button>
+                            <button onClick={() => toggleMsegSide(2)} style={sideBtn(msegSides[2])}>右</button>
+                          </div>
+                        ) : (
+                          <div style={{ padding: '0 12px 10px', display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 24px)', gap: 2, justifyContent: 'center' }}>
+                            <div /><button onClick={() => toggleMsegSide(0)} style={sideBtn(msegSides[0])}>上</button><div />
+                            <button onClick={() => toggleMsegSide(3)} style={sideBtn(msegSides[3])}>左</button><div /><button onClick={() => toggleMsegSide(1)} style={sideBtn(msegSides[1])}>右</button>
+                            <div /><button onClick={() => toggleMsegSide(2)} style={sideBtn(msegSides[2])}>下</button><div />
+                          </div>
+                        )}
                       </>
                     );
                   })()}
@@ -2011,7 +2019,7 @@ export default function CoverDesignerPage() {
                     </>
                   )}
 
-                  {isDiamond && (
+                  {isDiamond && !isMseg && (
                     <>
                       <div style={S.sectionTitle}>角の丸み</div>
                       <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -2024,7 +2032,7 @@ export default function CoverDesignerPage() {
                     </>
                   )}
 
-                  {isTriangle && (
+                  {isTriangle && !isMseg && (
                     <>
                       <div style={S.sectionTitle}>角の丸み</div>
                       <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -2049,9 +2057,9 @@ export default function CoverDesignerPage() {
                       <>
                         <div style={S.sectionTitle}>辺の表示</div>
                         <div style={{ padding: '0 12px 10px', display: 'flex', gap: 4, justifyContent: 'center' }}>
-                          <button onClick={() => toggleTriSide('s0')} style={sideBtn(triSides.s0)}>右</button>
-                          <button onClick={() => toggleTriSide('s1')} style={sideBtn(triSides.s1)}>底</button>
                           <button onClick={() => toggleTriSide('s2')} style={sideBtn(triSides.s2)}>左</button>
+                          <button onClick={() => toggleTriSide('s1')} style={sideBtn(triSides.s1)}>底</button>
+                          <button onClick={() => toggleTriSide('s0')} style={sideBtn(triSides.s0)}>右</button>
                         </div>
                       </>
                     );

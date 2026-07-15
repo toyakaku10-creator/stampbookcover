@@ -856,7 +856,7 @@ export default function StampEditorPage() {
   const applyDiamondRadius = useCallback((radius: number) => {
     const canvas = fabricRef.current;
     const old = canvas?.getActiveObject() ?? lastActiveRef.current;
-    if (!canvas || !old || (old as any)._shapeType !== 'h-diamond') return;
+    if (!canvas || !old || (old as any)._shapeType !== 'h-diamond' || (old as any)._msegCorners) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabric = (canvas as any)._fabric;
     if (!fabric) return;
@@ -885,7 +885,7 @@ export default function StampEditorPage() {
   const applyTriangleRadius = useCallback((radius: number) => {
     const canvas = fabricRef.current;
     const old = canvas?.getActiveObject() ?? lastActiveRef.current;
-    if (!canvas || !old || (old as any)._shapeType !== 'triangle') return;
+    if (!canvas || !old || (old as any)._shapeType !== 'triangle' || (old as any)._msegCorners) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fabric = (canvas as any)._fabric;
     if (!fabric) return;
@@ -1497,7 +1497,6 @@ export default function StampEditorPage() {
 
           {/* ── mseg（矩形マルチセグメント）プロパティ ──────── */}
           {(selectedShapeType === 'mseg' || isMseg) && (() => {
-            const sideLabels = ['上', '右', '下', '左'];
             const sideBtn = (active: boolean): React.CSSProperties => ({
               background: active ? 'var(--accent)' : 'var(--bg)',
               color: active ? '#1A1A1A' : 'var(--text)',
@@ -1505,6 +1504,7 @@ export default function StampEditorPage() {
               cursor: 'pointer', fontSize: 10, fontWeight: 600,
               padding: 0, width: 28, height: 24,
             });
+            const isTriMseg = msegSides.length === 3;
             return (
               <>
                 <div style={{ height: 1, background: 'var(--border)' }} />
@@ -1518,18 +1518,26 @@ export default function StampEditorPage() {
                 </div>
                 <div>
                   <div style={S.label}>辺の表示</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 24px)', gap: 2, justifyContent: 'center' }}>
-                    <div /><button onClick={() => toggleMsegSide(0)} style={sideBtn(msegSides[0])}>{sideLabels[0]}</button><div />
-                    <button onClick={() => toggleMsegSide(3)} style={sideBtn(msegSides[3])}>{sideLabels[3]}</button><div /><button onClick={() => toggleMsegSide(1)} style={sideBtn(msegSides[1])}>{sideLabels[1]}</button>
-                    <div /><button onClick={() => toggleMsegSide(2)} style={sideBtn(msegSides[2])}>{sideLabels[2]}</button><div />
-                  </div>
+                  {isTriMseg ? (
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                      <button onClick={() => toggleMsegSide(0)} style={sideBtn(msegSides[0])}>左</button>
+                      <button onClick={() => toggleMsegSide(1)} style={sideBtn(msegSides[1])}>底</button>
+                      <button onClick={() => toggleMsegSide(2)} style={sideBtn(msegSides[2])}>右</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 24px)', gap: 2, justifyContent: 'center' }}>
+                      <div /><button onClick={() => toggleMsegSide(0)} style={sideBtn(msegSides[0])}>上</button><div />
+                      <button onClick={() => toggleMsegSide(3)} style={sideBtn(msegSides[3])}>左</button><div /><button onClick={() => toggleMsegSide(1)} style={sideBtn(msegSides[1])}>右</button>
+                      <div /><button onClick={() => toggleMsegSide(2)} style={sideBtn(msegSides[2])}>下</button><div />
+                    </div>
+                  )}
                 </div>
               </>
             );
           })()}
 
           {/* ── 菱形プロパティ ───────────────────────────────── */}
-          {selectedShapeType === 'h-diamond' && (
+          {selectedShapeType === 'h-diamond' && !isMseg && (
             <>
               <div style={{ height: 1, background: 'var(--border)' }} />
               <div>
@@ -1544,7 +1552,7 @@ export default function StampEditorPage() {
           )}
 
           {/* ── 三角形プロパティ ─────────────────────────────── */}
-          {selectedShapeType === 'triangle' && (
+          {selectedShapeType === 'triangle' && !isMseg && (
             <>
               <div style={{ height: 1, background: 'var(--border)' }} />
               <div>
@@ -1725,9 +1733,9 @@ export default function StampEditorPage() {
                   <div>
                     <div style={S.label}>辺の表示</div>
                     <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 4 }}>
-                      <button onClick={() => toggleTriSide('s0')} style={sideBtn(triSides.s0)}>右</button>
-                      <button onClick={() => toggleTriSide('s1')} style={sideBtn(triSides.s1)}>底</button>
                       <button onClick={() => toggleTriSide('s2')} style={sideBtn(triSides.s2)}>左</button>
+                      <button onClick={() => toggleTriSide('s1')} style={sideBtn(triSides.s1)}>底</button>
+                      <button onClick={() => toggleTriSide('s0')} style={sideBtn(triSides.s0)}>右</button>
                     </div>
                   </div>
                 );

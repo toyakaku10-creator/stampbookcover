@@ -9,7 +9,7 @@ import {
   MousePointer2, Square, Circle, Triangle, Type, Maximize2, BookOpen, FileJson,
 } from 'lucide-react';
 import type { Stamp as StampType, Tool } from '@/lib/types';
-import { getStamps } from '@/lib/stampStorage';
+import { getStamps, saveStamp } from '@/lib/stampStorage';
 import { buildObjectAt, roundedPolygonPath, buildSegmentGroup } from '@/lib/shapePlacement';
 
 const COVER_PRESETS = [
@@ -922,6 +922,54 @@ export default function CoverDesignerPage() {
     }
     canvas.renderAll();
     saveHistoryRef.current();
+  };
+
+  const registerAsStamp = async () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject();
+    if (!active) return;
+
+    const name = window.prompt('スタンプ名を入力してください', 'スタンプ');
+    if (!name) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod: any = await import('fabric');
+    const fabric: any = mod.fabric ?? mod.default ?? mod;
+
+    const objects: any[] = active.type === 'activeselection'
+      ? (active as any).getObjects()
+      : [active];
+
+    const cloned: any[] = await Promise.all(objects.map((o: any) => o.clone()));
+
+    let thumbnail = '';
+    try {
+      const thumbEl = document.createElement('canvas');
+      const thumbCanvas: any = new fabric.Canvas(thumbEl, { width: 200, height: 200, backgroundColor: '#ffffff' });
+      const group = new fabric.Group(cloned);
+      const w = group.getScaledWidth?.() ?? group.width ?? 1;
+      const h = group.getScaledHeight?.() ?? group.height ?? 1;
+      const scale = 160 / Math.max(w, h, 1);
+      group.set({ scaleX: scale, scaleY: scale, left: 100, top: 100, originX: 'center', originY: 'center' });
+      thumbCanvas.add(group);
+      thumbCanvas.renderAll();
+      thumbnail = thumbCanvas.toDataURL({ format: 'png', multiplier: 1 });
+      thumbCanvas.dispose();
+    } catch {
+      thumbnail = '';
+    }
+
+    const cloned2: any[] = await Promise.all(objects.map((o: any) => o.clone()));
+    const stamp: StampType = {
+      id: `stamp-${Date.now()}`,
+      name,
+      thumbnail,
+      fabricJSON: { objects: cloned2.map((o: any) => o.toObject()) },
+      createdAt: new Date().toISOString(),
+    };
+    saveStamp(stamp);
+    window.alert(`「${name}」をスタンプとして登録しました`);
   };
 
   const applySize = useCallback((wMm: number, hMm: number) => {
@@ -2165,6 +2213,14 @@ export default function CoverDesignerPage() {
                 <button onClick={deleteSelected}
                   style={{ ...S.btn(false, true), flex: 1, fontSize: 10, padding: '5px 4px' }}>
                   <Trash2 size={11} />削除
+                </button>
+              </div>
+
+              {/* スタンプ登録 */}
+              <div style={{ padding: '0 12px 8px' }}>
+                <button onClick={registerAsStamp}
+                  style={{ ...S.btn(), width: '100%', fontSize: 10, padding: '5px 4px' }}>
+                  <Stamp size={11} />スタンプに登録
                 </button>
               </div>
             </div>

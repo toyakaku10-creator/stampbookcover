@@ -944,11 +944,51 @@ export default function CoverDesignerPage() {
     const mod: any = await import('fabric');
     const fabric: any = mod.fabric ?? mod.default ?? mod;
 
-    const objects: any[] = active.type === 'activeselection'
+    // fabricJSON に保存するオブジェクトのJSONを生成する。
+    // 単一Groupは子要素をキャンバス絶対座標でフラット化して、
+    // スタンプエディタで個々の図形として編集できるようにする。
+    // mseg図形（_msegCornersあり）は1つのまとまった図形なのでそのまま保存する。
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buildObjectsJSON = (): any[] => {
+      const isPlainGroup =
+        (active as any).type === 'group' && !(active as any)._msegCorners;
+
+      if ((active as any).type === 'activeselection') {
+        // 複数選択: 各オブジェクトはキャンバス絶対座標を保持している
+        return (active as any).getObjects().map((o: any) => o.toObject(CLONE_EXTRA_PROPS));
+      }
+
+      if (isPlainGroup) {
+        // 単一グループ（配置済みスタンプ等）: 子要素をキャンバス絶対座標に変換してフラット化
+        // child.calcTransformMatrix() はグループ変換を含むキャンバス絶対行列を返す
+        return (active as any).getObjects().map((child: any) => {
+          const mat = child.calcTransformMatrix();
+          const dec = fabric.util.qrDecompose(mat);
+          const json = child.toObject(CLONE_EXTRA_PROPS);
+          return {
+            ...json,
+            left: dec.translateX,
+            top: dec.translateY,
+            scaleX: dec.scaleX,
+            scaleY: dec.scaleY,
+            angle: dec.angle,
+            skewX: dec.skewX ?? 0,
+            skewY: dec.skewY ?? 0,
+            flipX: false,
+            flipY: false,
+          };
+        });
+      }
+
+      // 単一図形（mseg含む）: そのまま保存
+      return [(active as any).toObject(CLONE_EXTRA_PROPS)];
+    };
+
+    // サムネイル生成用クローン（activeselection か単一オブジェクトかに関わらず1グループにまとめる）
+    const srcObjects: any[] = (active as any).type === 'activeselection'
       ? (active as any).getObjects()
       : [active];
-
-    const cloned: any[] = await Promise.all(objects.map((o: any) => o.clone()));
+    const cloned: any[] = await Promise.all(srcObjects.map((o: any) => o.clone(CLONE_EXTRA_PROPS)));
 
     let thumbnail = '';
     try {
@@ -967,12 +1007,11 @@ export default function CoverDesignerPage() {
       thumbnail = '';
     }
 
-    const cloned2: any[] = await Promise.all(objects.map((o: any) => o.clone()));
     const stamp: StampType = {
       id: `stamp-${Date.now()}`,
       name,
       thumbnail,
-      fabricJSON: { objects: cloned2.map((o: any) => o.toObject()) },
+      fabricJSON: { objects: buildObjectsJSON() },
       createdAt: new Date().toISOString(),
     };
     saveStamp(stamp);

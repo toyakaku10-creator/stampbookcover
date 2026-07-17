@@ -898,6 +898,13 @@ export default function CoverDesignerPage() {
     localStorage.removeItem('coverdesigner-canvas-state');
   };
 
+  const CLONE_EXTRA_PROPS = [
+    '_shapeType', '_msegCorners', '_msegSides', '_msegRadius',
+    '_trapTop', '_trapBottom', '_trapHeight',
+    '_arcRadius', '_arcStartAngle', '_arcEndAngle',
+    '_isFillShape', '_msegChild',
+  ];
+
   const duplicateSelected = async () => {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -906,7 +913,7 @@ export default function CoverDesignerPage() {
 
     if (active.type === 'activeselection') {
       const objs = (active as any).getObjects();
-      const clones: any[] = await Promise.all(objs.map((o: any) => o.clone()));
+      const clones: any[] = await Promise.all(objs.map((o: any) => o.clone(CLONE_EXTRA_PROPS)));
       canvas.discardActiveObject();
       clones.forEach(c => { c.set({ left: c.left + 20, top: c.top + 20 }); canvas.add(c); });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -915,7 +922,7 @@ export default function CoverDesignerPage() {
       const sel = new fabric.ActiveSelection(clones, { canvas });
       canvas.setActiveObject(sel);
     } else {
-      const cloned = await active.clone();
+      const cloned = await (active as any).clone(CLONE_EXTRA_PROPS);
       cloned.set({ left: active.left + 20, top: active.top + 20 });
       canvas.add(cloned);
       canvas.setActiveObject(cloned);

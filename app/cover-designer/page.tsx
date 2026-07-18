@@ -228,6 +228,13 @@ export default function CoverDesignerPage() {
   const [arcEndAngle, setArcEndAngle]     = useState(0);
   const [isDot, setIsDot] = useState(false);
   const [dotRadius, setDotRadius] = useState(3);
+  const [isTextObj, setIsTextObj] = useState(false);
+  const [fontSize, setFontSize]       = useState(24);
+  const [fontFamily, setFontFamily]   = useState('Arial');
+  const [isBold, setIsBold]           = useState(false);
+  const [isItalic, setIsItalic]       = useState(false);
+  const [isUnderline, setIsUnderline] = useState(false);
+  const [isVertical, setIsVertical]   = useState(false);
   const [isRectSides, setIsRectSides] = useState(false);
   const [isFourSidedPoly, setIsFourSidedPoly] = useState(false);
   const [rectSides, setRectSides] = useState({ top: true, right: true, bottom: true, left: true });
@@ -279,6 +286,9 @@ export default function CoverDesignerPage() {
   useEffect(() => { stampSizeRef.current = stampSize; }, [stampSize]);
   useEffect(() => { bgColorRef.current = bgColor; localStorage.setItem('coverdesigner-canvas-bg', bgColor); }, [bgColor]);
   useEffect(() => { if (fabricRef.current) fabricRef.current.polygonSides = polygonSides; }, [polygonSides]);
+  useEffect(() => {
+    if (fabricRef.current) fabricRef.current.textOptions = { fontSize, fontFamily, bold: isBold, italic: isItalic, underline: isUnderline, vertical: isVertical };
+  }, [fontSize, fontFamily, isBold, isItalic, isUnderline, isVertical]);
 
   // ── アンドゥ ──────────────────────────────────────────────────────
   const saveHistory = useCallback(() => {
@@ -355,6 +365,16 @@ export default function CoverDesignerPage() {
     setIsDot(obj._shapeType === 'dot');
     if (obj._shapeType === 'dot') {
       setDotRadius(obj.radius ?? 3);
+    }
+    const isText = obj.type === 'i-text' || obj.type === 'text';
+    setIsTextObj(isText);
+    if (isText) {
+      setFontSize(obj.fontSize ?? 24);
+      setFontFamily(obj.fontFamily ?? 'Arial');
+      setIsBold(obj.fontWeight === 'bold');
+      setIsItalic(obj.fontStyle === 'italic');
+      setIsUnderline(obj.underline ?? false);
+      setIsVertical(obj.direction === 'rtl');
     }
     setIsDiamond(obj._shapeType === 'h-diamond');
     setIsTriangle(obj._shapeType === 'triangle');
@@ -1207,6 +1227,23 @@ export default function CoverDesignerPage() {
     canvas.renderAll();
     saveHistoryRef.current();
   }, []);
+
+  const applyTextProp = useCallback((props: Record<string, unknown>) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const active: any = canvas?.getActiveObject();
+    if (!canvas || !active) return;
+    active.set(props);
+    canvas.renderAll();
+    saveHistoryRef.current();
+  }, []);
+
+  const applyFontSize   = useCallback((v: number) => { setFontSize(v);   applyTextProp({ fontSize: v }); }, [applyTextProp]);
+  const applyFontFamily = useCallback((v: string) => { setFontFamily(v); applyTextProp({ fontFamily: v }); }, [applyTextProp]);
+  const toggleBold      = useCallback(() => setIsBold(prev => { const next = !prev; applyTextProp({ fontWeight: next ? 'bold' : 'normal' }); return next; }), [applyTextProp]);
+  const toggleItalic    = useCallback(() => setIsItalic(prev => { const next = !prev; applyTextProp({ fontStyle: next ? 'italic' : 'normal' }); return next; }), [applyTextProp]);
+  const toggleUnderline = useCallback(() => setIsUnderline(prev => { const next = !prev; applyTextProp({ underline: next }); return next; }), [applyTextProp]);
+  const toggleVertical  = useCallback(() => setIsVertical(prev => { const next = !prev; applyTextProp({ direction: next ? 'rtl' : 'ltr' }); return next; }), [applyTextProp]);
 
   const applyTrapezoidRadius = useCallback(async (radius: number) => {
     const canvas = fabricRef.current;
@@ -2313,6 +2350,47 @@ export default function CoverDesignerPage() {
                           onChange={e => { const r = Number(e.target.value); setDotRadius(r); applyDotRadius(r); }}
                           style={{ flex: 1 }} />
                         <span style={{ fontSize: 11, width: 24, textAlign: 'center' }}>{dotRadius}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {isTextObj && (
+                    <>
+                      <div style={S.sectionTitle}>テキスト</div>
+                      <div style={{ padding: '0 12px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div>
+                          <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>フォント</div>
+                          <select value={fontFamily} onChange={e => applyFontFamily(e.target.value)}
+                            style={{ width: '100%', padding: '4px 6px', fontSize: 11,
+                              background: 'var(--bg)', color: 'var(--text)',
+                              border: '1px solid var(--border)', borderRadius: 4, appearance: 'none' as const }}>
+                            {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, color: '#888', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+                            <span>サイズ</span><span style={{ color: 'var(--accent)' }}>{fontSize}px</span>
+                          </div>
+                          <input type="range" min={8} max={120} value={fontSize}
+                            onChange={e => applyFontSize(Number(e.target.value))}
+                            style={{ width: '100%' }} />
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {([
+                            { icon: <Bold size={14} />,      active: isBold,      toggle: toggleBold,      title: '太字' },
+                            { icon: <Italic size={14} />,    active: isItalic,    toggle: toggleItalic,    title: '斜体' },
+                            { icon: <Underline size={14} />, active: isUnderline, toggle: toggleUnderline, title: '下線' },
+                            { icon: <AlignLeft size={14} />, active: isVertical,  toggle: toggleVertical,  title: '縦書き' },
+                          ] as { icon: React.ReactNode; active: boolean; toggle: () => void; title: string }[]).map((item, i) => (
+                            <button key={i} title={item.title} onClick={item.toggle}
+                              style={{ flex: 1, height: 30, borderRadius: 6, border: 'none', cursor: 'pointer',
+                                background: item.active ? 'var(--accent)' : 'var(--bg)',
+                                color: item.active ? '#0F2340' : 'var(--text)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {item.icon}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </>
                   )}

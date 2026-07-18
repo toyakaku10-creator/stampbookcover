@@ -208,7 +208,6 @@ export default function CoverDesignerPage() {
   const [applyToSameType, setApplyToSameType] = useState(false);
   const applyToSameTypeRef = useRef(false);
   const [showReplacePanel, setShowReplacePanel] = useState(false);
-  const [debugMessage, setDebugMessage] = useState('');
   const [selFill, setSelFill] = useState('#000000');
   const [selStroke, setSelStroke] = useState('#000000');
   const [selStrokeW, setSelStrokeW] = useState(1);
@@ -291,7 +290,6 @@ export default function CoverDesignerPage() {
   useEffect(() => { stampsRef.current = stamps; }, [stamps]);
   useEffect(() => { stampSizeRef.current = stampSize; }, [stampSize]);
   useEffect(() => { isStampRef.current = isStamp; }, [isStamp]);
-  useEffect(() => { if (debugMessage) { const t = setTimeout(() => setDebugMessage(''), 8000); return () => clearTimeout(t); } }, [debugMessage]);
   useEffect(() => { applyToSameTypeRef.current = applyToSameType; }, [applyToSameType]);
   useEffect(() => { bgColorRef.current = bgColor; localStorage.setItem('coverdesigner-canvas-bg', bgColor); }, [bgColor]);
   useEffect(() => { if (fabricRef.current) fabricRef.current.polygonSides = polygonSides; }, [polygonSides]);
@@ -307,7 +305,11 @@ export default function CoverDesignerPage() {
     const json: any = canvas.toJSON(['isOverlay', 'data']);
     json.backgroundColor = undefined;
     // isOverlay フラグを持つオーバーレイ（エリア選択枠）を履歴から除外
-    json.objects = (json.objects ?? []).filter((o: any) => !o.isOverlay);
+    // per-object serialization で data を確実に含める
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    json.objects = (canvas.getObjects() as any[])
+      .map((o: any) => o.toObject(['isOverlay', 'data']))
+      .filter((o: any) => !o.isOverlay);
     historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
     historyRef.current.push(JSON.stringify(json));
     if (historyRef.current.length > 50) historyRef.current.shift();
@@ -800,7 +802,10 @@ export default function CoverDesignerPage() {
       disposed = true;
       if (canvas) {
         try {
-          const json = JSON.stringify(canvas.toJSON(['isOverlay', 'data']));
+          const baseJson: any = canvas.toJSON(['isOverlay', 'data']);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          baseJson.objects = (canvas.getObjects() as any[]).map((o: any) => o.toObject(['isOverlay', 'data']));
+          const json = JSON.stringify(baseJson);
           localStorage.setItem('coverdesigner-canvas-state', json);
           localStorage.setItem('coverdesigner-canvas-bg', bgColorRef.current);
         } catch { /* ignore */ }
@@ -1926,11 +1931,11 @@ export default function CoverDesignerPage() {
 
   const exportDesign = () => {
     if (!fabricRef.current) return;
-    const json = fabricRef.current.toJSON(['isOverlay', 'data']);
+    const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const withData = (json.objects ?? []).filter((o: any) => o.data?.stampId);
+    const json: any = canvas.toJSON(['isOverlay', 'data']);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setDebugMessage(`書き出し: ${(json.objects ?? []).length}個中 ${withData.length}個にdata.stampIdあり / 例: ${JSON.stringify((json.objects as any[])?.[0]?.data)}`);
+    json.objects = (canvas.getObjects() as any[]).map((o: any) => o.toObject(['isOverlay', 'data']));
     const data = {
       canvas: json,
       backgroundColor: bgColorRef.current,
@@ -1956,7 +1961,6 @@ export default function CoverDesignerPage() {
         const data = JSON.parse(event.target?.result as string);
         isBatchingRef.current = true;
         await fabricRef.current!.loadFromJSON(data.canvas);
-        { const objs = fabricRef.current!.getObjects() as any[]; const withData = objs.filter((o: any) => o.data?.stampId); setDebugMessage(`読込: ${objs.length}個中 ${withData.length}個にdata.stampIdあり / 例: ${JSON.stringify(withData[0]?.data)}`); }
         const newBg = data.backgroundColor || '#ffffff';
         bgColorRef.current = newBg;
         setBgColor(newBg);
@@ -1984,11 +1988,6 @@ export default function CoverDesignerPage() {
 
   return (
     <div style={{ height: '100vh', overflowX: 'auto', overflowY: 'hidden', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column', minWidth: 'fit-content' }}>
-      {debugMessage && (
-        <div style={{ position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)', background: '#C9A84C', color: '#0F2340', padding: '8px 16px', borderRadius: 6, zIndex: 9999, fontSize: 13, fontWeight: 500, pointerEvents: 'none' }}>
-          {debugMessage}
-        </div>
-      )}
       <AppHeader>
         {/* ① 編集系 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

@@ -1950,6 +1950,8 @@ export default function CoverDesignerPage() {
         const data = JSON.parse(event.target?.result as string);
         isBatchingRef.current = true;
         await fabricRef.current!.loadFromJSON(data.canvas);
+        // eslint-disable-next-line no-alert
+        { const objs = fabricRef.current!.getObjects() as any[]; const withData = objs.filter(o => o.data?.stampId); alert('読み込んだオブジェクト数: ' + objs.length + ' / data.stampIdあり: ' + withData.length + ' / 例: ' + JSON.stringify(withData[0]?.data)); }
         const newBg = data.backgroundColor || '#ffffff';
         bgColorRef.current = newBg;
         setBgColor(newBg);

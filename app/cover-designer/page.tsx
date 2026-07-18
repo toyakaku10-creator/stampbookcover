@@ -235,6 +235,7 @@ export default function CoverDesignerPage() {
   const [isItalic, setIsItalic]       = useState(false);
   const [isUnderline, setIsUnderline] = useState(false);
   const [isVertical, setIsVertical]   = useState(false);
+  const [lineCoords, setLineCoords] = useState<{ ax1: number; ay1: number; ax2: number; ay2: number } | null>(null);
   const [isRectSides, setIsRectSides] = useState(false);
   const [isFourSidedPoly, setIsFourSidedPoly] = useState(false);
   const [rectSides, setRectSides] = useState({ top: true, right: true, bottom: true, left: true });
@@ -338,6 +339,21 @@ export default function CoverDesignerPage() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [undo]);
 
+  // ── 直線 絶対座標取得 ─────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getLineAbsCoords = useCallback((line: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric = (fabricRef.current as any)?._fabric;
+    if (!fabric) return null;
+    const matrix = line.calcTransformMatrix();
+    const p1 = fabric.util.transformPoint({ x: line.x1, y: line.y1 }, matrix);
+    const p2 = fabric.util.transformPoint({ x: line.x2, y: line.y2 }, matrix);
+    return {
+      ax1: Math.round(p1.x), ay1: Math.round(p1.y),
+      ax2: Math.round(p2.x), ay2: Math.round(p2.y),
+    };
+  }, []);
+
   // ── 選択オブジェクト プロパティ更新 ─────────────────────────────
   const updateSelProps = useCallback(() => {
     const canvas = fabricRef.current;
@@ -376,6 +392,11 @@ export default function CoverDesignerPage() {
       setIsUnderline(obj.underline ?? false);
       setIsVertical(obj.direction === 'rtl');
     }
+    if (obj.type === 'line') {
+      setLineCoords(getLineAbsCoords(obj));
+    } else {
+      setLineCoords(null);
+    }
     setIsDiamond(obj._shapeType === 'h-diamond');
     setIsTriangle(obj._shapeType === 'triangle');
     const isMsegObj = !!obj._msegCorners;
@@ -405,7 +426,7 @@ export default function CoverDesignerPage() {
     setSelSize(Math.round(Math.max(obj.getScaledWidth?.() ?? 0, obj.getScaledHeight?.() ?? 0)));
     setSelRx(Math.round(obj.rx ?? 0));
     setSelTrapRx(obj._shapeType === 'trapezoid' ? Math.round(obj._msegRadius ?? obj._trapRadius ?? 0) : obj._shapeType === 'h-diamond' ? Math.round(obj._diamondRadius ?? 0) : obj._shapeType === 'triangle' ? Math.round(obj._triangleRadius ?? 0) : 0);
-  }, []);
+  }, [getLineAbsCoords]);
 
   const updateSelPropsRef = useRef(updateSelProps);
   useEffect(() => { updateSelPropsRef.current = updateSelProps; }, [updateSelProps]);
@@ -1244,6 +1265,35 @@ export default function CoverDesignerPage() {
   const toggleItalic    = useCallback(() => setIsItalic(prev => { const next = !prev; applyTextProp({ fontStyle: next ? 'italic' : 'normal' }); return next; }), [applyTextProp]);
   const toggleUnderline = useCallback(() => setIsUnderline(prev => { const next = !prev; applyTextProp({ underline: next }); return next; }), [applyTextProp]);
   const toggleVertical  = useCallback(() => setIsVertical(prev => { const next = !prev; applyTextProp({ direction: next ? 'rtl' : 'ltr' }); return next; }), [applyTextProp]);
+
+  const updateLineEndpoint = useCallback((endpoint: 1 | 2, axis: 'x' | 'y', value: number) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const line: any = canvas?.getActiveObject();
+    if (!canvas || !line || line.type !== 'line') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric = (canvas as any)._fabric;
+    if (!fabric) return;
+    const matrix    = line.calcTransformMatrix();
+    const invMatrix = fabric.util.invertTransform(matrix);
+    const p1 = fabric.util.transformPoint({ x: line.x1, y: line.y1 }, matrix);
+    const p2 = fabric.util.transformPoint({ x: line.x2, y: line.y2 }, matrix);
+    const target = endpoint === 1 ? { x: p1.x, y: p1.y } : { x: p2.x, y: p2.y };
+    if (axis === 'x') target.x = value; else target.y = value;
+    const local = fabric.util.transformPoint(target, invMatrix);
+    if (endpoint === 1) {
+      line.set({ x1: local.x, y1: local.y });
+    } else {
+      line.set({ x2: local.x, y2: local.y });
+    }
+    line.setCoords();
+    const newMatrix = line.calcTransformMatrix();
+    const np1 = fabric.util.transformPoint({ x: line.x1, y: line.y1 }, newMatrix);
+    const np2 = fabric.util.transformPoint({ x: line.x2, y: line.y2 }, newMatrix);
+    setLineCoords({ ax1: Math.round(np1.x), ay1: Math.round(np1.y), ax2: Math.round(np2.x), ay2: Math.round(np2.y) });
+    canvas.renderAll();
+    saveHistoryRef.current();
+  }, []);
 
   const applyTrapezoidRadius = useCallback(async (radius: number) => {
     const canvas = fabricRef.current;
@@ -2390,6 +2440,40 @@ export default function CoverDesignerPage() {
                               {item.icon}
                             </button>
                           ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {lineCoords !== null && (
+                    <>
+                      <div style={S.sectionTitle}>始点 / 終点</div>
+                      <div style={{ padding: '0 12px 8px' }}>
+                        <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>始点</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+                          <span style={{ fontSize: 11, color: '#888', width: 14 }}>X</span>
+                          <input type="number" value={lineCoords.ax1}
+                            onChange={e => updateLineEndpoint(1, 'x', Number(e.target.value))}
+                            style={{ width: 54, padding: '3px 5px', textAlign: 'center', fontSize: 11,
+                              background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }} />
+                          <span style={{ fontSize: 11, color: '#888', width: 14 }}>Y</span>
+                          <input type="number" value={lineCoords.ay1}
+                            onChange={e => updateLineEndpoint(1, 'y', Number(e.target.value))}
+                            style={{ width: 54, padding: '3px 5px', textAlign: 'center', fontSize: 11,
+                              background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }} />
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--accent)', marginBottom: 4 }}>終点</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 11, color: '#888', width: 14 }}>X</span>
+                          <input type="number" value={lineCoords.ax2}
+                            onChange={e => updateLineEndpoint(2, 'x', Number(e.target.value))}
+                            style={{ width: 54, padding: '3px 5px', textAlign: 'center', fontSize: 11,
+                              background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }} />
+                          <span style={{ fontSize: 11, color: '#888', width: 14 }}>Y</span>
+                          <input type="number" value={lineCoords.ay2}
+                            onChange={e => updateLineEndpoint(2, 'y', Number(e.target.value))}
+                            style={{ width: 54, padding: '3px 5px', textAlign: 'center', fontSize: 11,
+                              background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 4 }} />
                         </div>
                       </div>
                     </>

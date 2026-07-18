@@ -1899,33 +1899,6 @@ export default function CoverDesignerPage() {
     URL.revokeObjectURL(url);
   };
 
-  const exportZebraIcon = () => {
-    const canvas = fabricRef.current;
-    if (!canvas) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const active: any = canvas.getActiveObject();
-    if (!active) {
-      alert('しまうまのオブジェクトを選択してください');
-      return;
-    }
-    const bound = active.getBoundingRect();
-    const size = Math.max(bound.width, bound.height) * 1.2;
-    const centerX = bound.left + bound.width / 2;
-    const centerY = bound.top + bound.height / 2;
-    const dataUrl = (canvas as any).toDataURL({
-      format: 'png',
-      left: centerX - size / 2,
-      top: centerY - size / 2,
-      width: size,
-      height: size,
-      multiplier: 512 / size,
-    });
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = 'zebra-icon-square.png';
-    a.click();
-  };
-
   const importDesign = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !fabricRef.current) return;
@@ -2029,7 +2002,6 @@ export default function CoverDesignerPage() {
                 {[
                   { label: 'JPEGで書き出し',            icon: <Download size={12} />, action: () => { exportJPEG();      setShowExportMenu(false); } },
                   { label: 'PDFで書き出し',              icon: <Download size={12} />, action: () => { exportPDF();       setShowExportMenu(false); } },
-                  { label: 'しまうまアイコン書き出し (512px PNG)', icon: <Download size={12} />, action: () => { exportZebraIcon(); setShowExportMenu(false); } },
                 ].map(item => (
                   <button key={item.label} onClick={item.action}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '7px 10px', background: 'none', border: 'none', color: 'var(--text)', fontSize: 12, cursor: 'pointer', borderRadius: 4 }}

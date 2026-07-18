@@ -85,8 +85,9 @@ export function buildSegmentGroup(
   const segs: any[] = [];
   const baseOpts = { stroke, strokeWidth, strokeUniform: true, fill: 'transparent' as const };
 
-  // 塗りつぶし専用Polygon（index 0、辺の表示に影響しない）
-  const fillPoly = new fabric.Polygon([...corners], {
+  // 塗りつぶし専用Path（角丸めに合わせた形状）
+  const fillPathStr = roundedPolygonPath(corners, radius);
+  const fillPoly = new fabric.Path(fillPathStr, {
     fill: fill || 'transparent',
     stroke: 'transparent',
     strokeWidth: 0,

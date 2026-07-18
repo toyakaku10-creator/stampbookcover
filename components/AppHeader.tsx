@@ -21,7 +21,7 @@ export default function AppHeader({
       display: 'flex', alignItems: 'center', padding: '0 12px', gap: 12,
     }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/zebra-icon.svg" alt="しまうま" style={{ height: 28, flexShrink: 0 }} />
+      <img src="/zebra-icon.png" alt="しまうまアイコン" style={{ height: 28, width: 28, objectFit: 'contain', flexShrink: 0 }} />
       <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--accent)', flexShrink: 0 }}>
         STAMP BOOK COVER
       </span>

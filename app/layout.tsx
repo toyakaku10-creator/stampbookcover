@@ -7,7 +7,11 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: "スタンプブックカバーデザイナー",
   description: "スタンプを作成してブックカバーをデザインするツール",
-  icons: { icon: '/zebra-icon.png' },
+  icons: {
+    icon: '/zebra-icon.png',
+    apple: '/zebra-icon.png',
+  },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -190,6 +190,7 @@ export default function StampEditorPage() {
   const [fillColor, setFillColor] = useState('transparent');
   const [strokeWidth, setStrokeWidth] = useState(1.5);    // ② 初期値を 1.5 に統一
   const [polygonSides, setPolygonSides] = useState(5);   // 多角形の角数（3〜12）
+  const [triangleType, setTriangleType] = useState<'equilateral' | 'right'>('equilateral'); // 三角形種別
   // テキスト専用
   const [fontSize, setFontSize]   = useState(24);
   const [fontFamily, setFontFamily] = useState('Arial');
@@ -685,11 +686,12 @@ export default function StampEditorPage() {
     if (!fabricRef.current) return;
     fabricRef.current.toolMode      = tool;
     fabricRef.current.polygonSides  = polygonSides;
+    fabricRef.current.triangleType  = triangleType;
     fabricRef.current.textOptions   = { fontSize, fontFamily, bold, italic, underline, vertical };
     fabricRef.current.selection     = tool === 'select';
     fabricRef.current.defaultCursor = tool === 'select' ? 'default' : 'crosshair';
     fabricRef.current.hoverCursor   = tool === 'select' ? 'move'    : 'crosshair';
-  }, [tool, polygonSides, fontSize, fontFamily, bold, italic, underline, vertical]);
+  }, [tool, polygonSides, triangleType, fontSize, fontFamily, bold, italic, underline, vertical]);
 
   // ② 色/線幅/透明度を fabricRef（配置デフォルト）に同期し、
   //    選択オブジェクトがあれば適用する
@@ -1424,6 +1426,23 @@ export default function StampEditorPage() {
         {/* ── アイコンツールバー ─────────────────────────────── */}
         <div style={S.toolbar}>
           {TOOLS.map(t => {
+            if (t.id === 'triangle') {
+              const isActive = tool === 'triangle';
+              const miniBtn = (active: boolean) => ({ width: 22, height: 16, border: '1px solid var(--border)', borderRadius: 3, background: active ? '#C9A84C' : 'var(--bg)', color: active ? '#1A1A1A' : 'var(--text)', cursor: 'pointer', fontSize: 9, fontWeight: 700, padding: 0, lineHeight: 1 } as const);
+              return (
+                <div key={t.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  <button title={t.title} onClick={() => setTool(isActive ? 'select' : 'triangle')} style={S.toolBtn(isActive)}>
+                    {t.icon}
+                  </button>
+                  {isActive && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <button onClick={() => setTriangleType('equilateral')} style={miniBtn(triangleType === 'equilateral')}>正</button>
+                      <button onClick={() => setTriangleType('right')}       style={miniBtn(triangleType === 'right')}>直</button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
             if (t.id === 'polygon') {
               const isActive = tool === 'polygon';
               return (

@@ -165,14 +165,28 @@ export function buildObjectAt(fabric: FabricLib, canvas: any, toolId: Tool, cx: 
     return new fabric.Ellipse({ ...opts, ...pos, rx: 30, ry: 30 });
   }
   if (toolId === 'triangle') {
-    const SIDE = 80;
-    const HEIGHT = Math.round(SIDE * (Math.sqrt(3) / 2));
-    // 中心原点・頂点順: 上→左下→右下（辺0=左辺、辺1=底辺、辺2=右辺）
-    const corners = [
-      { x: 0, y: -HEIGHT / 2 },
-      { x: -SIDE / 2, y: HEIGHT / 2 },
-      { x:  SIDE / 2, y: HEIGHT / 2 },
-    ];
+    // 正三角形 or 直角三角形
+    const triangleType: string = canvas.triangleType ?? 'equilateral';
+    let corners: { x: number; y: number }[];
+    if (triangleType === 'right') {
+      // 直角三角形: 直角を左下に置き、BBox 80×80 を中央原点で配置
+      const S = 80;
+      corners = [
+        { x: -S / 2, y: -S / 2 }, // 左上
+        { x: -S / 2, y:  S / 2 }, // 左下（直角）
+        { x:  S / 2, y:  S / 2 }, // 右下
+      ];
+    } else {
+      // 正三角形（デフォルト）
+      const SIDE = 80;
+      const HEIGHT = Math.round(SIDE * (Math.sqrt(3) / 2));
+      // 中心原点・頂点順: 上→左下→右下（辺0=左辺、辺1=底辺、辺2=右辺）
+      corners = [
+        { x: 0, y: -HEIGHT / 2 },
+        { x: -SIDE / 2, y: HEIGHT / 2 },
+        { x:  SIDE / 2, y: HEIGHT / 2 },
+      ];
+    }
     const sidesEnabled = [true, true, true];
     const group = buildSegmentGroup(fabric, corners, 0, sidesEnabled, color, sw, fill, {
       left: cx, top: cy, originX: 'center' as const, originY: 'center' as const,

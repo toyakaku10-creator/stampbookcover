@@ -252,6 +252,8 @@ export default function CoverDesignerPage() {
 
   // 多角形の角数
   const [polygonSides, setPolygonSides] = useState(5);
+  // 三角形種別
+  const [triangleType, setTriangleType] = useState<'equilateral' | 'right'>('equilateral');
 
   // エリア指定
   const [areaMode, setAreaMode] = useState<'full' | 'custom'>('full');
@@ -293,6 +295,7 @@ export default function CoverDesignerPage() {
   useEffect(() => { applyToSameTypeRef.current = applyToSameType; }, [applyToSameType]);
   useEffect(() => { bgColorRef.current = bgColor; localStorage.setItem('coverdesigner-canvas-bg', bgColor); }, [bgColor]);
   useEffect(() => { if (fabricRef.current) fabricRef.current.polygonSides = polygonSides; }, [polygonSides]);
+  useEffect(() => { if (fabricRef.current) fabricRef.current.triangleType = triangleType; }, [triangleType]);
   useEffect(() => {
     if (fabricRef.current) fabricRef.current.textOptions = { fontSize, fontFamily, bold: isBold, italic: isItalic, underline: isUnderline, vertical: isVertical };
   }, [fontSize, fontFamily, isBold, isItalic, isUnderline, isVertical]);
@@ -2275,6 +2278,22 @@ export default function CoverDesignerPage() {
                   color: isActive ? '#1A1A1A' : 'var(--text)',
                   fontSize: 8, fontWeight: 600, width: '100%',
                 };
+                if (t.id === 'triangle') {
+                  const miniBtn = (active: boolean) => ({ width: 22, height: 16, border: '1px solid var(--border)', borderRadius: 3, background: active ? '#C9A84C' : 'var(--bg)', color: active ? '#1A1A1A' : 'var(--text)', cursor: 'pointer', fontSize: 9, fontWeight: 700, padding: 0, lineHeight: 1 } as const);
+                  return (
+                    <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <button onClick={() => setTool(isActive ? 'select' : 'triangle')} title={t.title} style={btnStyle}>
+                        {t.icon}三角
+                      </button>
+                      {isActive && (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                          <button onClick={() => setTriangleType('equilateral')} style={miniBtn(triangleType === 'equilateral')}>正</button>
+                          <button onClick={() => setTriangleType('right')}       style={miniBtn(triangleType === 'right')}>直</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
                 if (t.id === 'polygon') {
                   return (
                     <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

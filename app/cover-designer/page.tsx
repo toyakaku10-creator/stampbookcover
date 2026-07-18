@@ -1927,6 +1927,10 @@ export default function CoverDesignerPage() {
   const exportDesign = () => {
     if (!fabricRef.current) return;
     const json = fabricRef.current.toJSON(['isOverlay', 'data']);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const withData = (json.objects ?? []).filter((o: any) => o.data?.stampId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setDebugMessage(`書き出し: ${(json.objects ?? []).length}個中 ${withData.length}個にdata.stampIdあり / 例: ${JSON.stringify((json.objects as any[])?.[0]?.data)}`);
     const data = {
       canvas: json,
       backgroundColor: bgColorRef.current,

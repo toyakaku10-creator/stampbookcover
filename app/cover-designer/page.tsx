@@ -7,7 +7,7 @@ import {
   Trash2, Copy, Download, Upload, ImageIcon, Minus, Plus,
   Stamp, ChevronDown, ChevronUp, X, Undo2, Magnet, Waves,
   MousePointer2, Square, Circle, Triangle, Type, Maximize2, BookOpen, FileJson,
-  Bold, Italic, Underline, AlignLeft,
+  Bold, Italic, Underline, AlignLeft, Repeat,
 } from 'lucide-react';
 
 const FONTS = ['Arial', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana', 'Impact'];
@@ -205,6 +205,7 @@ export default function CoverDesignerPage() {
   const [hasSelection, setHasSelection] = useState(false);
   const [isStamp, setIsStamp] = useState(false);
   const [applyToSameType, setApplyToSameType] = useState(false);
+  const [showReplacePanel, setShowReplacePanel] = useState(false);
   const [selFill, setSelFill] = useState('#000000');
   const [selStroke, setSelStroke] = useState('#000000');
   const [selStrokeW, setSelStrokeW] = useState(1);
@@ -447,6 +448,35 @@ export default function CoverDesignerPage() {
     canvas.renderAll();
     saveHistoryRef.current();
   }, [isStamp, applyToSameType]);
+
+  const replaceStamp = useCallback((newStampId: string) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const active = canvas?.getActiveObject() as any;
+    if (!canvas || !active) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = (canvas as any)._fabric;
+    if (!fabric) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stamp = (stampsRef.current as any[]).find((s: any) => s.id === newStampId);
+    if (!stamp) return;
+    const { left, top, angle, scaleX, scaleY, opacity } = active;
+    const json = stamp.fabricJSON as { objects?: object[] };
+    fabric.util.enlivenObjects([...(json.objects || [])]).then((enlivened: any[]) => {
+      if (!enlivened.length) return;
+      const group = new fabric.Group(enlivened, {
+        left, top, angle, scaleX, scaleY, opacity,
+        originX: 'center' as const, originY: 'center' as const,
+        data: { stampId: newStampId },
+      });
+      canvas.remove(active);
+      canvas.add(group);
+      canvas.setActiveObject(group);
+      canvas.renderAll();
+      saveHistoryRef.current();
+      setShowReplacePanel(false);
+    });
+  }, []);
 
   const applySelProp = useCallback((props: object) => {
     const canvas = fabricRef.current;
@@ -2666,6 +2696,33 @@ export default function CoverDesignerPage() {
                   <Trash2 size={11} />削除
                 </button>
               </div>
+
+              {/* スタンプ置き換え */}
+              {isStamp && (
+                <div style={{ padding: '0 12px 8px' }}>
+                  <button onClick={() => setShowReplacePanel(v => !v)}
+                    style={{ ...S.btn(showReplacePanel), width: '100%', fontSize: 10, padding: '5px 4px' }}>
+                    <Repeat size={11} />スタンプを置き換え
+                  </button>
+                  {showReplacePanel && (
+                    <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+                      {stamps.map(stamp => (
+                        <div key={stamp.id} onClick={() => replaceStamp(stamp.id)}
+                          style={{
+                            width: 36, height: 36, cursor: 'pointer', borderRadius: 4,
+                            border: '1px solid #2A4570', background: '#fff', overflow: 'hidden',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = '#C9A84C'; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = '#2A4570'; }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={stamp.thumbnail} alt={stamp.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 2 }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* スタンプ登録 */}
               <div style={{ padding: '0 12px 8px' }}>

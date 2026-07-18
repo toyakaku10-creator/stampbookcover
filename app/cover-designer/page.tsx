@@ -1031,39 +1031,50 @@ export default function CoverDesignerPage() {
     // スタンプエディタで個々の図形として編集できるようにする。
     // mseg図形（_msegCornersあり）は1つのまとまった図形なのでそのまま保存する。
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const STAMP_EDITOR_SIZE = 400;
     const buildObjectsJSON = (): any[] => {
-      const isPlainGroup =
-        (active as any).type === 'group' && !(active as any)._msegCorners;
+      const type = (active as any).type;
+      const isPlainGroup = type === 'group' && !(active as any)._msegCorners;
 
-      if ((active as any).type === 'activeselection') {
-        // 複数選択: 各オブジェクトはキャンバス絶対座標を保持している
-        return (active as any).getObjects().map((o: any) => o.toObject(CLONE_EXTRA_PROPS));
+      // 対象オブジェクトを収集
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let sources: any[];
+      if (type === 'activeselection' || isPlainGroup) {
+        sources = (active as any).getObjects();
+      } else {
+        sources = [active as any];
       }
 
-      if (isPlainGroup) {
-        // 単一グループ（配置済みスタンプ等）: 子要素をキャンバス絶対座標に変換してフラット化
-        // child.calcTransformMatrix() はグループ変換を含むキャンバス絶対行列を返す
-        return (active as any).getObjects().map((child: any) => {
-          const mat = child.calcTransformMatrix();
-          const dec = fabric.util.qrDecompose(mat);
-          const json = child.toObject(CLONE_EXTRA_PROPS);
-          return {
-            ...json,
-            left: dec.translateX,
-            top: dec.translateY,
-            scaleX: dec.scaleX,
-            scaleY: dec.scaleY,
-            angle: dec.angle,
-            skewX: dec.skewX ?? 0,
-            skewY: dec.skewY ?? 0,
-            flipX: false,
-            flipY: false,
-          };
-        });
-      }
+      // 全オブジェクトをキャンバス絶対座標に変換
+      // calcTransformMatrix() はグループ階層を含む絶対行列を返す
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const absItems = sources.map((obj: any) => {
+        const mat = obj.calcTransformMatrix();
+        const dec = fabric.util.qrDecompose(mat);
+        return { json: obj.toObject(CLONE_EXTRA_PROPS), dec };
+      });
 
-      // 単一図形（mseg含む）: そのまま保存
-      return [(active as any).toObject(CLONE_EXTRA_PROPS)];
+      // 全オブジェクトの重心を stamp-editor キャンバス中心 (200, 200) にオフセット
+      // これにより large canvas 上の絶対座標が 400x400 キャンバス上で中央に収まる
+      const cx = absItems.reduce((s, o) => s + o.dec.translateX, 0) / absItems.length;
+      const cy = absItems.reduce((s, o) => s + o.dec.translateY, 0) / absItems.length;
+      const dx = STAMP_EDITOR_SIZE / 2 - cx;
+      const dy = STAMP_EDITOR_SIZE / 2 - cy;
+
+      return absItems.map(({ json, dec }) => ({
+        ...json,
+        left:   dec.translateX + dx,
+        top:    dec.translateY + dy,
+        scaleX: dec.scaleX,
+        scaleY: dec.scaleY,
+        angle:  dec.angle,
+        skewX:  dec.skewX  ?? 0,
+        skewY:  dec.skewY  ?? 0,
+        flipX:  false,
+        flipY:  false,
+        originX: 'center' as const,
+        originY: 'center' as const,
+      }));
     };
 
     // サムネイル生成用クローン（activeselection か単一オブジェクトかに関わらず1グループにまとめる）
@@ -1874,6 +1885,21 @@ export default function CoverDesignerPage() {
     URL.revokeObjectURL(url);
   };
 
+  const exportZebraIcon = () => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const active: any = canvas.getActiveObject();
+    const svg = active ? active.toSVG() : canvas.toSVG();
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'zebra-icon.svg';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const importDesign = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !fabricRef.current) return;
@@ -1975,8 +2001,9 @@ export default function CoverDesignerPage() {
                 boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
               }}>
                 {[
-                  { label: 'JPEGで書き出し',       icon: <Download size={12} />, action: () => { exportJPEG(); setShowExportMenu(false); } },
-                  { label: 'PDFで書き出し',         icon: <Download size={12} />, action: () => { exportPDF();  setShowExportMenu(false); } },
+                  { label: 'JPEGで書き出し',            icon: <Download size={12} />, action: () => { exportJPEG();      setShowExportMenu(false); } },
+                  { label: 'PDFで書き出し',              icon: <Download size={12} />, action: () => { exportPDF();       setShowExportMenu(false); } },
+                  { label: 'しまうまSVG書き出し（一時）', icon: <Download size={12} />, action: () => { exportZebraIcon(); setShowExportMenu(false); } },
                 ].map(item => (
                   <button key={item.label} onClick={item.action}
                     style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '7px 10px', background: 'none', border: 'none', color: 'var(--text)', fontSize: 12, cursor: 'pointer', borderRadius: 4 }}

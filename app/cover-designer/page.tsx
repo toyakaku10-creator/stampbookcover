@@ -603,13 +603,24 @@ export default function CoverDesignerPage() {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             fabric.util.enlivenObjects([...(json.objects || [])]).then((enlivened: any[]) => {
               if (!enlivened.length) return;
-              const group = new fabric.Group(enlivened, {
+              // 一時グループで位置・スケールを決定してから解体し、個々の図形として配置する。
+              // removeAll() は Fabric.js v7 の _exitGroup によりグループ変換を各子に適用して
+              // キャンバス絶対座標に変換するため、手動の行列計算は不要。
+              const tempGroup = new fabric.Group(enlivened, {
                 left: x, top: y, originX: 'center', originY: 'center',
               });
-              const naturalSize = Math.max(group.width ?? 1, group.height ?? 1);
-              if (naturalSize > 0) group.scale(stampSizeRef.current / naturalSize);
-              canvas.add(group);
-              canvas.setActiveObject(group);
+              const naturalSize = Math.max(tempGroup.width ?? 1, tempGroup.height ?? 1);
+              if (naturalSize > 0) tempGroup.scale(stampSizeRef.current / naturalSize);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const children: any[] = [...tempGroup.getObjects()];
+              tempGroup.removeAll();
+              children.forEach(obj => canvas.add(obj));
+              if (children.length === 1) {
+                canvas.setActiveObject(children[0]);
+              } else if (children.length > 1) {
+                const sel = new fabric.ActiveSelection(children, { canvas });
+                canvas.setActiveObject(sel);
+              }
               canvas.renderAll();
             });
           }
@@ -739,12 +750,15 @@ export default function CoverDesignerPage() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const enlivened: any[] = await fabric.util.enlivenObjects([...(json.objects || [])]);
           if (!enlivened || !enlivened.length) continue;
-          const group = new fabric.Group(enlivened, {
+          const tempGroup = new fabric.Group(enlivened, {
             left: pos.x, top: pos.y, originX: 'center', originY: 'center',
           });
-          const naturalSize = Math.max(group.width ?? 1, group.height ?? 1);
-          if (naturalSize > 0) group.scale(stampSize / naturalSize);
-          canvas.add(group);
+          const naturalSize = Math.max(tempGroup.width ?? 1, tempGroup.height ?? 1);
+          if (naturalSize > 0) tempGroup.scale(stampSize / naturalSize);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const children: any[] = [...tempGroup.getObjects()];
+          tempGroup.removeAll();
+          children.forEach(obj => canvas.add(obj));
         }
         // 配置後に点線枠を削除
         if (areaRectRef.current) {

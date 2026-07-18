@@ -208,6 +208,7 @@ export default function CoverDesignerPage() {
   const [applyToSameType, setApplyToSameType] = useState(false);
   const applyToSameTypeRef = useRef(false);
   const [showReplacePanel, setShowReplacePanel] = useState(false);
+  const [debugMessage, setDebugMessage] = useState('');
   const [selFill, setSelFill] = useState('#000000');
   const [selStroke, setSelStroke] = useState('#000000');
   const [selStrokeW, setSelStrokeW] = useState(1);
@@ -290,6 +291,7 @@ export default function CoverDesignerPage() {
   useEffect(() => { stampsRef.current = stamps; }, [stamps]);
   useEffect(() => { stampSizeRef.current = stampSize; }, [stampSize]);
   useEffect(() => { isStampRef.current = isStamp; }, [isStamp]);
+  useEffect(() => { if (debugMessage) { const t = setTimeout(() => setDebugMessage(''), 8000); return () => clearTimeout(t); } }, [debugMessage]);
   useEffect(() => { applyToSameTypeRef.current = applyToSameType; }, [applyToSameType]);
   useEffect(() => { bgColorRef.current = bgColor; localStorage.setItem('coverdesigner-canvas-bg', bgColor); }, [bgColor]);
   useEffect(() => { if (fabricRef.current) fabricRef.current.polygonSides = polygonSides; }, [polygonSides]);
@@ -1950,8 +1952,7 @@ export default function CoverDesignerPage() {
         const data = JSON.parse(event.target?.result as string);
         isBatchingRef.current = true;
         await fabricRef.current!.loadFromJSON(data.canvas);
-        // eslint-disable-next-line no-alert
-        { const objs = fabricRef.current!.getObjects() as any[]; const withData = objs.filter(o => o.data?.stampId); alert('読み込んだオブジェクト数: ' + objs.length + ' / data.stampIdあり: ' + withData.length + ' / 例: ' + JSON.stringify(withData[0]?.data)); }
+        { const objs = fabricRef.current!.getObjects() as any[]; const withData = objs.filter((o: any) => o.data?.stampId); setDebugMessage(`読込: ${objs.length}個中 ${withData.length}個にdata.stampIdあり / 例: ${JSON.stringify(withData[0]?.data)}`); }
         const newBg = data.backgroundColor || '#ffffff';
         bgColorRef.current = newBg;
         setBgColor(newBg);
@@ -1979,6 +1980,11 @@ export default function CoverDesignerPage() {
 
   return (
     <div style={{ height: '100vh', overflowX: 'auto', overflowY: 'hidden', background: 'var(--bg)', color: 'var(--text)', display: 'flex', flexDirection: 'column', minWidth: 'fit-content' }}>
+      {debugMessage && (
+        <div style={{ position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)', background: '#C9A84C', color: '#0F2340', padding: '8px 16px', borderRadius: 6, zIndex: 9999, fontSize: 13, fontWeight: 500, pointerEvents: 'none' }}>
+          {debugMessage}
+        </div>
+      )}
       <AppHeader>
         {/* ① 編集系 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

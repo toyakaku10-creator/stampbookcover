@@ -204,6 +204,7 @@ export default function CoverDesignerPage() {
   // 右サイドバー プロパティ
   const [hasSelection, setHasSelection] = useState(false);
   const [isStamp, setIsStamp] = useState(false);
+  const [applyToSameType, setApplyToSameType] = useState(false);
   const [selFill, setSelFill] = useState('#000000');
   const [selStroke, setSelStroke] = useState('#000000');
   const [selStrokeW, setSelStrokeW] = useState(1);
@@ -671,24 +672,15 @@ export default function CoverDesignerPage() {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             fabric.util.enlivenObjects([...(json.objects || [])]).then((enlivened: any[]) => {
               if (!enlivened.length) return;
-              // 一時グループで位置・スケールを決定してから解体し、個々の図形として配置する。
-              // removeAll() は Fabric.js v7 の _exitGroup によりグループ変換を各子に適用して
-              // キャンバス絶対座標に変換するため、手動の行列計算は不要。
-              const tempGroup = new fabric.Group(enlivened, {
+              // スタンプはグループとして配置し、stampId で種類を識別できるようにする
+              const group = new fabric.Group(enlivened, {
                 left: x, top: y, originX: 'center', originY: 'center',
+                data: { stampId },
               });
-              const naturalSize = Math.max(tempGroup.width ?? 1, tempGroup.height ?? 1);
-              if (naturalSize > 0) tempGroup.scale(stampSizeRef.current / naturalSize);
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const children: any[] = [...tempGroup.getObjects()];
-              tempGroup.removeAll();
-              children.forEach(obj => canvas.add(obj));
-              if (children.length === 1) {
-                canvas.setActiveObject(children[0]);
-              } else if (children.length > 1) {
-                const sel = new fabric.ActiveSelection(children, { canvas });
-                canvas.setActiveObject(sel);
-              }
+              const naturalSize = Math.max(group.width ?? 1, group.height ?? 1);
+              if (naturalSize > 0) group.scale(stampSizeRef.current / naturalSize);
+              canvas.add(group);
+              canvas.setActiveObject(group);
               canvas.renderAll();
             });
           }
@@ -818,15 +810,13 @@ export default function CoverDesignerPage() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const enlivened: any[] = await fabric.util.enlivenObjects([...(json.objects || [])]);
           if (!enlivened || !enlivened.length) continue;
-          const tempGroup = new fabric.Group(enlivened, {
+          const group = new fabric.Group(enlivened, {
             left: pos.x, top: pos.y, originX: 'center', originY: 'center',
+            data: { stampId: sid },
           });
-          const naturalSize = Math.max(tempGroup.width ?? 1, tempGroup.height ?? 1);
-          if (naturalSize > 0) tempGroup.scale(stampSize / naturalSize);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const children: any[] = [...tempGroup.getObjects()];
-          tempGroup.removeAll();
-          children.forEach(obj => canvas.add(obj));
+          const naturalSize = Math.max(group.width ?? 1, group.height ?? 1);
+          if (naturalSize > 0) group.scale(stampSize / naturalSize);
+          canvas.add(group);
         }
         // 配置後に点線枠を削除
         if (areaRectRef.current) {
@@ -2590,11 +2580,16 @@ export default function CoverDesignerPage() {
               <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <button onClick={() => {
                   const canvas = fabricRef.current;
-                  const obj = canvas?.getActiveObject();
-                  if (!obj) return;
+                  const obj = canvas?.getActiveObject() as any;
+                  if (!canvas || !obj) return;
                   const cur = Math.max(obj.getScaledWidth(), obj.getScaledHeight());
                   const next = Math.max(10, cur - 5);
-                  obj.scale((obj.scaleX ?? 1) * next / cur);
+                  const naturalSize = Math.max(obj.width ?? 1, obj.height ?? 1);
+                  const newScale = next / naturalSize;
+                  const targets = (isStamp && applyToSameType)
+                    ? (canvas as any).getObjects().filter((o: any) => o.data?.stampId === obj.data?.stampId)
+                    : [obj];
+                  targets.forEach((o: any) => { o.set({ scaleX: newScale, scaleY: newScale }); o.setCoords(); });
                   canvas.renderAll();
                   setSelSize(Math.round(next));
                   saveHistoryRef.current();
@@ -2602,17 +2597,28 @@ export default function CoverDesignerPage() {
                 <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{selSize}</span>
                 <button onClick={() => {
                   const canvas = fabricRef.current;
-                  const obj = canvas?.getActiveObject();
-                  if (!obj) return;
+                  const obj = canvas?.getActiveObject() as any;
+                  if (!canvas || !obj) return;
                   const cur = Math.max(obj.getScaledWidth(), obj.getScaledHeight());
                   const next = cur + 5;
-                  obj.scale((obj.scaleX ?? 1) * next / cur);
+                  const naturalSize = Math.max(obj.width ?? 1, obj.height ?? 1);
+                  const newScale = next / naturalSize;
+                  const targets = (isStamp && applyToSameType)
+                    ? (canvas as any).getObjects().filter((o: any) => o.data?.stampId === obj.data?.stampId)
+                    : [obj];
+                  targets.forEach((o: any) => { o.set({ scaleX: newScale, scaleY: newScale }); o.setCoords(); });
                   canvas.renderAll();
                   setSelSize(Math.round(next));
                   saveHistoryRef.current();
                 }} style={S.iconBtn()}><Plus size={12} /></button>
                 <span style={{ fontSize: 11, color: '#888' }}>px</span>
               </div>
+              {isStamp && (
+                <label style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={applyToSameType} onChange={e => setApplyToSameType(e.target.checked)} />
+                  同じ種類全部に適用
+                </label>
+              )}
 
               {/* 透明度 */}
               <div style={S.sectionTitle}>透明度</div>

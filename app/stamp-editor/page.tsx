@@ -1328,7 +1328,9 @@ export default function StampEditorPage() {
 
   const loadStamp = useCallback((stamp: Stamp) => {
     if (!fabricRef.current) return;
-    fabricRef.current.loadFromJSON(stamp.fabricJSON, () => {
+    // Fabric.js v7 では loadFromJSON が Promise を返す（v6 のコールバック API は廃止）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (fabricRef.current.loadFromJSON(stamp.fabricJSON) as any).then(() => {
       // loadFromJSON がキャンバスをスタンプのサイズに縮小することがあるため元に戻す
       fabricRef.current.setDimensions({ width: CANVAS_SIZE, height: CANVAS_SIZE });
       fabricRef.current.backgroundColor = bgColorRef.current;

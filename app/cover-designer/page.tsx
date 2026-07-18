@@ -1036,42 +1036,55 @@ export default function CoverDesignerPage() {
       const type = (active as any).type;
       const isPlainGroup = type === 'group' && !(active as any)._msegCorners;
 
-      // 対象オブジェクトを収集
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let sources: any[];
-      if (type === 'activeselection' || isPlainGroup) {
-        sources = (active as any).getObjects();
-      } else {
-        sources = [active as any];
+      // ── 単一図形（mseg含む）: left/top を stamp-editor 中心に上書き ──
+      // matrix 計算を避け確実に (200, 200) に配置する
+      // scaleX/scaleY/angle 等は toObject() の値をそのまま使用
+      if (!isPlainGroup && type !== 'activeselection') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const json = (active as any).toObject(CLONE_EXTRA_PROPS);
+        console.debug('[stamp] single', json.type, 'orig left:', json.left, 'top:', json.top);
+        return [{
+          ...json,
+          left:    STAMP_EDITOR_SIZE / 2,
+          top:     STAMP_EDITOR_SIZE / 2,
+          originX: 'center' as const,
+          originY: 'center' as const,
+        }];
       }
 
-      // 全オブジェクトをキャンバス絶対座標に変換
-      // calcTransformMatrix() はグループ階層を含む絶対行列を返す
+      // ── activeselection / plainGroup: 各オブジェクトの絶対座標を取得してオフセット ──
+      // calcTransformMatrix() でグループ階層を含む canvas 絶対行列を取得
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sources: any[] = (active as any).getObjects();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const absItems = sources.map((obj: any) => {
         const mat = obj.calcTransformMatrix();
         const dec = fabric.util.qrDecompose(mat);
-        return { json: obj.toObject(CLONE_EXTRA_PROPS), dec };
+        // getCenterPoint() で originX/Y によらず canvas 絶対中心を取得
+        const cp = obj.getCenterPoint();
+        console.debug('[stamp] child', obj.type, 'dec.tx:', dec.translateX, 'cp.x:', cp.x);
+        return { json: obj.toObject(CLONE_EXTRA_PROPS), cx: cp.x, cy: cp.y, dec };
       });
 
-      // 全オブジェクトの重心を stamp-editor キャンバス中心 (200, 200) にオフセット
-      // これにより large canvas 上の絶対座標が 400x400 キャンバス上で中央に収まる
-      const cx = absItems.reduce((s, o) => s + o.dec.translateX, 0) / absItems.length;
-      const cy = absItems.reduce((s, o) => s + o.dec.translateY, 0) / absItems.length;
-      const dx = STAMP_EDITOR_SIZE / 2 - cx;
-      const dy = STAMP_EDITOR_SIZE / 2 - cy;
+      // オブジェクト群の重心を stamp-editor キャンバス中心 (200, 200) にオフセット
+      const groupCx = absItems.reduce((s, o) => s + o.cx, 0) / absItems.length;
+      const groupCy = absItems.reduce((s, o) => s + o.cy, 0) / absItems.length;
+      const dx = STAMP_EDITOR_SIZE / 2 - groupCx;
+      const dy = STAMP_EDITOR_SIZE / 2 - groupCy;
+      console.debug('[stamp] group center:', groupCx, groupCy, 'dx:', dx, 'dy:', dy);
 
-      return absItems.map(({ json, dec }) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return absItems.map(({ json, cx, cy, dec }: any) => ({
         ...json,
-        left:   dec.translateX + dx,
-        top:    dec.translateY + dy,
-        scaleX: dec.scaleX,
-        scaleY: dec.scaleY,
-        angle:  dec.angle,
-        skewX:  dec.skewX  ?? 0,
-        skewY:  dec.skewY  ?? 0,
-        flipX:  false,
-        flipY:  false,
+        left:    cx + dx,
+        top:     cy + dy,
+        scaleX:  dec.scaleX,
+        scaleY:  dec.scaleY,
+        angle:   dec.angle,
+        skewX:   dec.skewX ?? 0,
+        skewY:   dec.skewY ?? 0,
+        flipX:   (json as any).flipX ?? false,
+        flipY:   (json as any).flipY ?? false,
         originX: 'center' as const,
         originY: 'center' as const,
       }));

@@ -70,6 +70,13 @@ const TOOLS: { id: Tool; icon: React.ReactNode; title: string }[] = [
   { id: 'text', icon: <Type size={18} />, title: 'テキスト' },
 ];
 
+const CLONE_EXTRA_PROPS = [
+  '_shapeType', '_msegCorners', '_msegSides', '_msegRadius',
+  '_trapTop', '_trapBottom', '_trapHeight',
+  '_arcRadius', '_arcStartAngle', '_arcEndAngle',
+  '_isFillShape', '_msegChild',
+];
+
 // ── 選択オブジェクトの有効プロパティを取得 ──────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getEffectiveProps(obj: any) {
@@ -1227,7 +1234,7 @@ export default function StampEditorPage() {
     if (active.type === 'activeselection') {
       const objs = (active as any).getObjects();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const clones: any[] = await Promise.all(objs.map((o: any) => o.clone()));
+      const clones: any[] = await Promise.all(objs.map((o: any) => o.clone(CLONE_EXTRA_PROPS)));
       canvas.discardActiveObject();
       clones.forEach(c => { c.set({ left: c.left + 20, top: c.top + 20 }); canvas.add(c); });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1237,7 +1244,7 @@ export default function StampEditorPage() {
       const sel = new fabric.ActiveSelection(clones, { canvas });
       canvas.setActiveObject(sel);
     } else {
-      const cloned = await active.clone();
+      const cloned = await (active as any).clone(CLONE_EXTRA_PROPS);
       cloned.set({ left: active.left + 20, top: active.top + 20 });
       canvas.add(cloned);
       canvas.setActiveObject(cloned);

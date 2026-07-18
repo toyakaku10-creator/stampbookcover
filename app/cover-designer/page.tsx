@@ -298,7 +298,7 @@ export default function CoverDesignerPage() {
     if (isBatchingRef.current || !fabricRef.current) return;
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const json: any = canvas.toJSON(['isOverlay']);
+    const json: any = canvas.toJSON(['isOverlay', 'data']);
     json.backgroundColor = undefined;
     // isOverlay フラグを持つオーバーレイ（エリア選択枠）を履歴から除外
     json.objects = (json.objects ?? []).filter((o: any) => !o.isOverlay);
@@ -792,7 +792,7 @@ export default function CoverDesignerPage() {
       disposed = true;
       if (canvas) {
         try {
-          const json = JSON.stringify(canvas.toJSON());
+          const json = JSON.stringify(canvas.toJSON(['isOverlay', 'data']));
           localStorage.setItem('coverdesigner-canvas-state', json);
           localStorage.setItem('coverdesigner-canvas-bg', bgColorRef.current);
         } catch { /* ignore */ }
@@ -1918,7 +1918,7 @@ export default function CoverDesignerPage() {
 
   const exportDesign = () => {
     if (!fabricRef.current) return;
-    const json = fabricRef.current.toJSON(['isOverlay']);
+    const json = fabricRef.current.toJSON(['isOverlay', 'data']);
     const data = {
       canvas: json,
       backgroundColor: bgColorRef.current,

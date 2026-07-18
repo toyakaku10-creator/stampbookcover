@@ -440,10 +440,14 @@ export default function CoverDesignerPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const active = canvas?.getActiveObject() as any;
     if (!canvas || !active) return;
+    // eslint-disable-next-line no-alert
+    alert('active.data: ' + JSON.stringify(active.data) + ' / isStamp: ' + isStamp + ' / applyToSameType: ' + applyToSameType);
     const targets: any[] = (isStamp && applyToSameType)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? (canvas as any).getObjects().filter((o: any) => o.data?.stampId && o.data.stampId === active.data?.stampId)
       : [active];
+    // eslint-disable-next-line no-alert
+    alert('targets count: ' + targets.length);
     targets.forEach(updater);
     canvas.renderAll();
     saveHistoryRef.current();

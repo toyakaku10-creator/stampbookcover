@@ -1850,20 +1850,21 @@ export default function CoverDesignerPage() {
       ctx.fill();
       ctx.restore();
 
-      // 表紙：白塗り + 縁取り
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(spineRight, 70, dispFrontW, 260);
-      ctx.strokeStyle = '#C0B8A8';
-      ctx.lineWidth = 0.8;
-      ctx.strokeRect(spineRight, 70, dispFrontW, 260);
-
-      // 表紙：画像（鏡文字打ち消し）
-      // 背表紙の切り出しが表紙側に食い込んだ分を削る
+      // 表紙：画像幅を先に確定（背表紙の食い込み分を差し引く）
       const spineOverlap = (sw - spineWidthPx) / 2 + OFFSET;
       const frontWidthPxAdjusted = frontWidthPx - spineOverlap;
+      const dispFrontWExact = Math.round(frontWidthPxAdjusted * 260 / bookHeightPxY);
+
+      // 表紙：白塗り + 縁取り（画像と同じ幅で描画して小口側の白余白を防ぐ）
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(spineRight, 70, dispFrontWExact, 260);
+      ctx.strokeStyle = '#C0B8A8';
+      ctx.lineWidth = 0.8;
+      ctx.strokeRect(spineRight, 70, dispFrontWExact, 260);
+
+      // 表紙：画像（鏡文字打ち消し）
       ctx.save();
       ctx.scale(-1, 1);
-      const dispFrontWExact = Math.round(frontWidthPxAdjusted * 260 / bookHeightPxY);
       ctx.drawImage(img, frontStartPx, bookStartPxY, frontWidthPxAdjusted, bookHeightPxY,
         -(spineRight + dispFrontWExact), 70, dispFrontWExact, 260);
       ctx.restore();

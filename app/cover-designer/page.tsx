@@ -204,7 +204,9 @@ export default function CoverDesignerPage() {
   // 右サイドバー プロパティ
   const [hasSelection, setHasSelection] = useState(false);
   const [isStamp, setIsStamp] = useState(false);
+  const isStampRef = useRef(false);
   const [applyToSameType, setApplyToSameType] = useState(false);
+  const applyToSameTypeRef = useRef(false);
   const [showReplacePanel, setShowReplacePanel] = useState(false);
   const [selFill, setSelFill] = useState('#000000');
   const [selStroke, setSelStroke] = useState('#000000');
@@ -287,6 +289,8 @@ export default function CoverDesignerPage() {
   useEffect(() => { setStamps(getStamps()); }, []);
   useEffect(() => { stampsRef.current = stamps; }, [stamps]);
   useEffect(() => { stampSizeRef.current = stampSize; }, [stampSize]);
+  useEffect(() => { isStampRef.current = isStamp; }, [isStamp]);
+  useEffect(() => { applyToSameTypeRef.current = applyToSameType; }, [applyToSameType]);
   useEffect(() => { bgColorRef.current = bgColor; localStorage.setItem('coverdesigner-canvas-bg', bgColor); }, [bgColor]);
   useEffect(() => { if (fabricRef.current) fabricRef.current.polygonSides = polygonSides; }, [polygonSides]);
   useEffect(() => {
@@ -434,24 +438,22 @@ export default function CoverDesignerPage() {
   useEffect(() => { updateSelPropsRef.current = updateSelProps; }, [updateSelProps]);
 
   // スタンプ「同じ種類全部に適用」共通ヘルパー
+  // refs 経由で最新の isStamp / applyToSameType を読む（useCallback の stale closure 対策）
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyToTargets = useCallback((updater: (obj: any) => void) => {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const active = canvas?.getActiveObject() as any;
     if (!canvas || !active) return;
-    // eslint-disable-next-line no-alert
-    alert('active.data: ' + JSON.stringify(active.data) + ' / isStamp: ' + isStamp + ' / applyToSameType: ' + applyToSameType);
-    const targets: any[] = (isStamp && applyToSameType)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const targets: any[] = (isStampRef.current && applyToSameTypeRef.current)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? (canvas as any).getObjects().filter((o: any) => o.data?.stampId && o.data.stampId === active.data?.stampId)
       : [active];
-    // eslint-disable-next-line no-alert
-    alert('targets count: ' + targets.length);
     targets.forEach(updater);
     canvas.renderAll();
     saveHistoryRef.current();
-  }, [isStamp, applyToSameType]);
+  }, []);
 
   const replaceStamp = useCallback((newStampId: string) => {
     const canvas = fabricRef.current;

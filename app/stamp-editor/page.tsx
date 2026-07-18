@@ -340,10 +340,9 @@ export default function StampEditorPage() {
       if (savedJson) {
         try {
           const parsed = JSON.parse(savedJson);
-          canvas.loadFromJSON(parsed, () => {
+          (canvas.loadFromJSON(parsed) as any).then(() => {
             canvas.backgroundColor = '#ffffff';
             canvas.renderAll();
-            setTimeout(() => { canvas.renderAll(); }, 100);
           });
         } catch { /* 破損データは無視 */ }
       }
@@ -746,16 +745,11 @@ export default function StampEditorPage() {
 
     historyIndexRef.current--;
     const json = JSON.parse(historyRef.current[historyIndexRef.current]);
-    canvas.loadFromJSON(json, () => {
+    (canvas.loadFromJSON(json) as any).then(() => {
       canvas.backgroundColor = '#ffffff';
       canvas.backgroundImage = undefined;
       canvas.renderAll();
       setCanUndo(historyIndexRef.current > 0);
-
-      setTimeout(() => {
-        canvas.backgroundColor = '#ffffff';
-        canvas.renderAll();
-      }, 50);
 
       // イベント再登録
       canvas.on('object:added',    onAdded);
@@ -1327,14 +1321,18 @@ export default function StampEditorPage() {
   }, [stampName]);
 
   const loadStamp = useCallback((stamp: Stamp) => {
-    if (!fabricRef.current) return;
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    // 既存オブジェクトを先にクリアして六連菱形等の残存を防ぐ
+    canvas.clear();
+    canvas.backgroundColor = '#ffffff';
     // Fabric.js v7 では loadFromJSON が Promise を返す（v6 のコールバック API は廃止）
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (fabricRef.current.loadFromJSON(stamp.fabricJSON) as any).then(() => {
+    (canvas.loadFromJSON(stamp.fabricJSON) as any).then(() => {
       // loadFromJSON がキャンバスをスタンプのサイズに縮小することがあるため元に戻す
-      fabricRef.current.setDimensions({ width: CANVAS_SIZE, height: CANVAS_SIZE });
-      fabricRef.current.backgroundColor = bgColorRef.current;
-      fabricRef.current.requestRenderAll();
+      canvas.setDimensions({ width: CANVAS_SIZE, height: CANVAS_SIZE });
+      canvas.backgroundColor = bgColorRef.current;
+      canvas.requestRenderAll();
     });
     setSelectedStampId(stamp.id);
   }, []);

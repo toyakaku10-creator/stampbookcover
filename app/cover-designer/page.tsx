@@ -7,10 +7,13 @@ import {
   Trash2, Copy, Download, Upload, ImageIcon, Minus, Plus,
   Stamp, ChevronDown, ChevronUp, X, Undo2, Magnet, Waves,
   MousePointer2, Square, Circle, Triangle, Type, Maximize2, BookOpen, FileJson,
+  Bold, Italic, Underline, AlignLeft,
 } from 'lucide-react';
+
+const FONTS = ['Arial', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana', 'Impact'];
 import type { Stamp as StampType, Tool } from '@/lib/types';
 import { getStamps, saveStamp } from '@/lib/stampStorage';
-import { buildObjectAt, roundedPolygonPath, buildSegmentGroup } from '@/lib/shapePlacement';
+import { buildObjectAt, roundedPolygonPath, buildSegmentGroup, buildArcPath } from '@/lib/shapePlacement';
 
 const COVER_PRESETS = [
   { name: '応募サイズ', w: 385, h: 152, locked: true },
@@ -216,6 +219,15 @@ export default function CoverDesignerPage() {
   const [msegRadius, setMsegRadius] = useState(0);
   const [msegSides, setMsegSides] = useState([true, true, true, true]);
   const [selTrapRx, setSelTrapRx] = useState(0);
+  const [trapTop, setTrapTop]       = useState(60);
+  const [trapBottom, setTrapBottom] = useState(90);
+  const [trapHeight, setTrapHeight] = useState(50);
+  const [isArc, setIsArc] = useState(false);
+  const [arcRadius, setArcRadius]         = useState(45);
+  const [arcStartAngle, setArcStartAngle] = useState(180);
+  const [arcEndAngle, setArcEndAngle]     = useState(0);
+  const [isDot, setIsDot] = useState(false);
+  const [dotRadius, setDotRadius] = useState(3);
   const [isRectSides, setIsRectSides] = useState(false);
   const [isFourSidedPoly, setIsFourSidedPoly] = useState(false);
   const [rectSides, setRectSides] = useState({ top: true, right: true, bottom: true, left: true });
@@ -329,6 +341,21 @@ export default function CoverDesignerPage() {
     const poly4 = obj.type === 'polygon' && (obj.points?.length ?? 0) === 4;
     setIsFourSidedPoly(poly4);
     setIsTrapezoid(obj._shapeType === 'trapezoid');
+    if (obj._shapeType === 'trapezoid') {
+      setTrapTop(obj._trapTop ?? 60);
+      setTrapBottom(obj._trapBottom ?? 90);
+      setTrapHeight(obj._trapHeight ?? 50);
+    }
+    setIsArc(obj._shapeType === 'arc');
+    if (obj._shapeType === 'arc') {
+      setArcRadius(obj._arcRadius ?? 45);
+      setArcStartAngle(obj._arcStartAngle ?? 180);
+      setArcEndAngle(obj._arcEndAngle ?? 0);
+    }
+    setIsDot(obj._shapeType === 'dot');
+    if (obj._shapeType === 'dot') {
+      setDotRadius(obj.radius ?? 3);
+    }
     setIsDiamond(obj._shapeType === 'h-diamond');
     setIsTriangle(obj._shapeType === 'triangle');
     const isMsegObj = !!obj._msegCorners;
@@ -1073,6 +1100,114 @@ export default function CoverDesignerPage() {
   };
 
   // ── 台形 角の丸み ──────────────────────────────────────────────────
+  const applyTrapezoidProps = useCallback((topW: number, botW: number, h: number) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const old: any = canvas?.getActiveObject();
+    if (!canvas || !old || old._shapeType !== 'trapezoid') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = (canvas as any)._fabric;
+    if (!fabric) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let newShape: any;
+    if (old._msegCorners) {
+      const corners = [
+        { x: -topW / 2, y: -h / 2 }, { x: topW / 2, y: -h / 2 },
+        { x: botW / 2, y:  h / 2 }, { x: -botW / 2, y:  h / 2 },
+      ];
+      const radius = old._msegRadius ?? 0;
+      const sides  = old._msegSides  ?? [true, true, true, true];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const children: any[] = old.getObjects?.() ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fillChild   = children.find((c: any) => c._isFillShape);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const strokeChild = children.find((c: any) => !c._isFillShape);
+      const fill   = fillChild?.fill   ?? 'transparent';
+      const stroke = strokeChild?.stroke      ?? '#C9A84C';
+      const sw     = strokeChild?.strokeWidth ?? 1.5;
+      newShape = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, fill, {
+        left: old.left, top: old.top, angle: old.angle,
+        scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
+        originX: old.originX, originY: old.originY,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newShape as any)._shapeType   = 'trapezoid';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newShape as any)._msegCorners = corners;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newShape as any)._msegRadius  = radius;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newShape as any)._msegSides   = sides;
+    } else {
+      const half = (botW - topW) / 2;
+      newShape = new fabric.Polygon(
+        [{ x: half, y: 0 }, { x: half + topW, y: 0 }, { x: botW, y: h }, { x: 0, y: h }],
+        {
+          left: old.left, top: old.top, angle: old.angle,
+          scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
+          stroke: old.stroke, strokeWidth: old.strokeWidth,
+          fill: old.fill, strokeUniform: true,
+        },
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newShape as any)._shapeType  = 'trapezoid';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newShape as any)._trapRadius = old._trapRadius ?? 0;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newShape as any)._trapTop    = topW;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newShape as any)._trapBottom = botW;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (newShape as any)._trapHeight = h;
+    canvas.remove(old);
+    canvas.add(newShape);
+    canvas.setActiveObject(newShape);
+    canvas.renderAll();
+    saveHistoryRef.current();
+  }, []);
+
+  const applyArcProps = useCallback((r: number, startDeg: number, endDeg: number) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const old: any = canvas?.getActiveObject();
+    if (!canvas || !old || old._shapeType !== 'arc') return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = (canvas as any)._fabric;
+    if (!fabric) return;
+    const p = new fabric.Path(buildArcPath(r, startDeg, endDeg), {
+      left: old.left, top: old.top, angle: old.angle,
+      scaleX: old.scaleX, scaleY: old.scaleY, opacity: old.opacity,
+      stroke: old.stroke, strokeWidth: old.strokeWidth,
+      fill: 'transparent', strokeUniform: true,
+      originX: old.originX, originY: old.originY,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (p as any)._shapeType    = 'arc';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (p as any)._arcRadius    = r;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (p as any)._arcStartAngle = startDeg;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (p as any)._arcEndAngle  = endDeg;
+    canvas.remove(old);
+    canvas.add(p);
+    canvas.setActiveObject(p);
+    canvas.renderAll();
+    saveHistoryRef.current();
+  }, []);
+
+  const applyDotRadius = useCallback((r: number) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const active: any = canvas?.getActiveObject();
+    if (!canvas || !active || active._shapeType !== 'dot') return;
+    active.set({ radius: r });
+    canvas.renderAll();
+    saveHistoryRef.current();
+  }, []);
+
   const applyTrapezoidRadius = useCallback(async (radius: number) => {
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2119,6 +2254,65 @@ export default function CoverDesignerPage() {
                           applySelProp({ rx: v, ry: v });
                           saveHistoryRef.current();
                         }} style={S.iconBtn()}><Plus size={12} /></button>
+                      </div>
+                    </>
+                  )}
+
+                  {isTrapezoid && (
+                    <>
+                      <div style={S.sectionTitle}>台形</div>
+                      <div style={{ padding: '0 12px 8px' }}>
+                        {([
+                          { label: '上辺', value: trapTop,    set: (v: number) => { setTrapTop(v);    applyTrapezoidProps(v, trapBottom, trapHeight); } },
+                          { label: '下辺', value: trapBottom, set: (v: number) => { setTrapBottom(v); applyTrapezoidProps(trapTop, v, trapHeight); } },
+                          { label: '高さ', value: trapHeight, set: (v: number) => { setTrapHeight(v); applyTrapezoidProps(trapTop, trapBottom, v); } },
+                        ] as { label: string; value: number; set: (v: number) => void }[]).map(({ label, value, set }) => (
+                          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                            <span style={{ fontSize: 11, color: '#888', width: 26 }}>{label}</span>
+                            <input type="number" min={1} max={200} value={value}
+                              onChange={e => set(Number(e.target.value))}
+                              style={{ width: 52, padding: '3px 5px', textAlign: 'center', fontSize: 11,
+                                background: 'var(--bg)', color: 'var(--text)',
+                                border: '1px solid var(--border)', borderRadius: 4 }} />
+                            <span style={{ fontSize: 11, color: '#888' }}>px</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {isArc && (
+                    <>
+                      <div style={S.sectionTitle}>円弧</div>
+                      <div style={{ padding: '0 12px 8px' }}>
+                        {([
+                          { label: '半径',   value: arcRadius,     min: 1,    max: 300, unit: 'px', set: (v: number) => { setArcRadius(v);     applyArcProps(v, arcStartAngle, arcEndAngle); } },
+                          { label: '開始角', value: arcStartAngle, min: -360, max: 360, unit: '°',  set: (v: number) => { setArcStartAngle(v); applyArcProps(arcRadius, v, arcEndAngle); } },
+                          { label: '終了角', value: arcEndAngle,   min: -360, max: 360, unit: '°',  set: (v: number) => { setArcEndAngle(v);   applyArcProps(arcRadius, arcStartAngle, v); } },
+                        ] as { label: string; value: number; min: number; max: number; unit: string; set: (v: number) => void }[]).map(({ label, value, min, max, unit, set }) => (
+                          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                            <span style={{ fontSize: 11, color: '#888', width: 36 }}>{label}</span>
+                            <input type="number" min={min} max={max} value={value}
+                              onChange={e => set(Number(e.target.value))}
+                              style={{ width: 52, padding: '3px 5px', textAlign: 'center', fontSize: 11,
+                                background: 'var(--bg)', color: 'var(--text)',
+                                border: '1px solid var(--border)', borderRadius: 4 }} />
+                            <span style={{ fontSize: 11, color: '#888' }}>{unit}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {isDot && (
+                    <>
+                      <div style={S.sectionTitle}>点</div>
+                      <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 11, color: '#888', width: 26 }}>半径</span>
+                        <input type="range" min={1} max={30} value={dotRadius}
+                          onChange={e => { const r = Number(e.target.value); setDotRadius(r); applyDotRadius(r); }}
+                          style={{ flex: 1 }} />
+                        <span style={{ fontSize: 11, width: 24, textAlign: 'center' }}>{dotRadius}</span>
                       </div>
                     </>
                   )}

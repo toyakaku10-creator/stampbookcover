@@ -432,6 +432,22 @@ export default function CoverDesignerPage() {
   const updateSelPropsRef = useRef(updateSelProps);
   useEffect(() => { updateSelPropsRef.current = updateSelProps; }, [updateSelProps]);
 
+  // スタンプ「同じ種類全部に適用」共通ヘルパー
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyToTargets = useCallback((updater: (obj: any) => void) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const active = canvas?.getActiveObject() as any;
+    if (!canvas || !active) return;
+    const targets: any[] = (isStamp && applyToSameType)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (canvas as any).getObjects().filter((o: any) => o.data?.stampId && o.data.stampId === active.data?.stampId)
+      : [active];
+    targets.forEach(updater);
+    canvas.renderAll();
+    saveHistoryRef.current();
+  }, [isStamp, applyToSameType]);
+
   const applySelProp = useCallback((props: object) => {
     const canvas = fabricRef.current;
     const obj = canvas?.getActiveObject();
@@ -2575,56 +2591,44 @@ export default function CoverDesignerPage() {
                 </>
               )}
 
-              {/* サイズ */}
-              <div style={S.sectionTitle}>サイズ</div>
-              <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <button onClick={() => {
-                  const canvas = fabricRef.current;
-                  const obj = canvas?.getActiveObject() as any;
-                  if (!canvas || !obj) return;
-                  const cur = Math.max(obj.getScaledWidth(), obj.getScaledHeight());
-                  const next = Math.max(10, cur - 5);
-                  const naturalSize = Math.max(obj.width ?? 1, obj.height ?? 1);
-                  const newScale = next / naturalSize;
-                  const targets = (isStamp && applyToSameType)
-                    ? (canvas as any).getObjects().filter((o: any) => o.data?.stampId === obj.data?.stampId)
-                    : [obj];
-                  targets.forEach((o: any) => { o.set({ scaleX: newScale, scaleY: newScale }); o.setCoords(); });
-                  canvas.renderAll();
-                  setSelSize(Math.round(next));
-                  saveHistoryRef.current();
-                }} style={S.iconBtn()}><Minus size={12} /></button>
-                <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{selSize}</span>
-                <button onClick={() => {
-                  const canvas = fabricRef.current;
-                  const obj = canvas?.getActiveObject() as any;
-                  if (!canvas || !obj) return;
-                  const cur = Math.max(obj.getScaledWidth(), obj.getScaledHeight());
-                  const next = cur + 5;
-                  const naturalSize = Math.max(obj.width ?? 1, obj.height ?? 1);
-                  const newScale = next / naturalSize;
-                  const targets = (isStamp && applyToSameType)
-                    ? (canvas as any).getObjects().filter((o: any) => o.data?.stampId === obj.data?.stampId)
-                    : [obj];
-                  targets.forEach((o: any) => { o.set({ scaleX: newScale, scaleY: newScale }); o.setCoords(); });
-                  canvas.renderAll();
-                  setSelSize(Math.round(next));
-                  saveHistoryRef.current();
-                }} style={S.iconBtn()}><Plus size={12} /></button>
-                <span style={{ fontSize: 11, color: '#888' }}>px</span>
-              </div>
+              {/* 同じ種類全部に適用チェックボックス（スタンプ選択時のみ） */}
               {isStamp && (
-                <label style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer' }}>
+                <label style={{ padding: '4px 12px 6px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer' }}>
                   <input type="checkbox" checked={applyToSameType} onChange={e => setApplyToSameType(e.target.checked)} />
                   同じ種類全部に適用
                 </label>
               )}
 
+              {/* サイズ */}
+              <div style={S.sectionTitle}>サイズ</div>
+              <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button onClick={() => {
+                  const obj = fabricRef.current?.getActiveObject() as any;
+                  if (!obj) return;
+                  const cur = Math.max(obj.getScaledWidth(), obj.getScaledHeight());
+                  const next = Math.max(10, cur - 5);
+                  const naturalSize = Math.max(obj.width ?? 1, obj.height ?? 1);
+                  applyToTargets((o: any) => { o.set({ scaleX: next / naturalSize, scaleY: next / naturalSize }); o.setCoords(); });
+                  setSelSize(Math.round(next));
+                }} style={S.iconBtn()}><Minus size={12} /></button>
+                <span style={{ flex: 1, textAlign: 'center', fontSize: 12 }}>{selSize}</span>
+                <button onClick={() => {
+                  const obj = fabricRef.current?.getActiveObject() as any;
+                  if (!obj) return;
+                  const cur = Math.max(obj.getScaledWidth(), obj.getScaledHeight());
+                  const next = cur + 5;
+                  const naturalSize = Math.max(obj.width ?? 1, obj.height ?? 1);
+                  applyToTargets((o: any) => { o.set({ scaleX: next / naturalSize, scaleY: next / naturalSize }); o.setCoords(); });
+                  setSelSize(Math.round(next));
+                }} style={S.iconBtn()}><Plus size={12} /></button>
+                <span style={{ fontSize: 11, color: '#888' }}>px</span>
+              </div>
+
               {/* 透明度 */}
               <div style={S.sectionTitle}>透明度</div>
               <div style={{ padding: '0 12px 8px' }}>
                 <input type="range" min={0} max={100} value={Math.round(selOpacity * 100)}
-                  onChange={e => { const v = Number(e.target.value) / 100; setSelOpacity(v); applySelProp({ opacity: v }); }}
+                  onChange={e => { const v = Number(e.target.value) / 100; setSelOpacity(v); applyToTargets((o: any) => o.set({ opacity: v })); }}
                   style={{ width: '100%' }} />
                 <div style={{ fontSize: 10, color: '#888', textAlign: 'right' }}>{Math.round(selOpacity * 100)}%</div>
               </div>
@@ -2633,7 +2637,7 @@ export default function CoverDesignerPage() {
               <div style={S.sectionTitle}>角度</div>
               <div style={{ padding: '0 12px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <input type="number" min={-360} max={360} value={selAngle}
-                  onChange={e => { const v = Number(e.target.value); setSelAngle(v); applySelProp({ angle: v }); }}
+                  onChange={e => { const v = Number(e.target.value); setSelAngle(v); applyToTargets((o: any) => o.set({ angle: v })); }}
                   style={{ flex: 1, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 6px', color: 'var(--text)', fontSize: 12 }} />
                 <span style={{ fontSize: 11, color: '#888' }}>°</span>
               </div>

@@ -329,6 +329,68 @@ export default function CoverDesignerPage() {
     saveHistoryRef.current();
   }, []);
 
+  // ── 旧構造 mseg 図形の自動マイグレーション ─────────────────────
+  const migrateOldMsegShapes = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = (canvas as any)._fabric;
+    if (!fabric) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const objects = canvas.getObjects() as any[];
+    let migratedCount = 0;
+
+    objects.forEach((obj: any) => {
+      const looksOld = obj._msegCorners && (!obj._objects || obj._objects.length === 0);
+      if (!looksOld) return;
+
+      const corners  = obj._msegCorners as { x: number; y: number }[];
+      const radius   = (obj._msegRadius as number) ?? 0;
+      const sides    = (obj._msegSides  as boolean[]) ?? Array(corners.length).fill(true);
+      const stroke   = (typeof obj.stroke === 'string' && obj.stroke) ? obj.stroke : '#C9A84C';
+      const sw       = obj.strokeWidth ?? 1.5;
+      const rawFill  = typeof obj.fill === 'string' ? obj.fill : '';
+      const fill     = rawFill && rawFill !== '' ? rawFill : 'transparent';
+
+      const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, fill, {
+        left:    obj.left,    top:    obj.top,    angle:  obj.angle  ?? 0,
+        scaleX:  obj.scaleX  ?? 1,   scaleY:  obj.scaleY  ?? 1,
+        opacity: obj.opacity ?? 1,
+        originX: obj.originX ?? 'left', originY: obj.originY ?? 'top',
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._shapeType   = obj._shapeType ?? 'mseg';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._msegCorners = corners;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._msegRadius  = radius;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._msegSides   = sides;
+      if (obj._trapTop !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (newGroup as any)._trapTop    = obj._trapTop;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (newGroup as any)._trapBottom = obj._trapBottom;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (newGroup as any)._trapHeight = obj._trapHeight;
+      }
+
+      canvas.remove(obj);
+      canvas.add(newGroup);
+      migratedCount++;
+    });
+
+    if (migratedCount > 0) {
+      canvas.renderAll();
+      saveHistoryRef.current();
+      console.info(`[mseg migrate] ${migratedCount}個の旧構造図形を新構造に変換しました`);
+    }
+  }, []);
+
+  const migrateOldMsegShapesRef = useRef(migrateOldMsegShapes);
+  useEffect(() => { migrateOldMsegShapesRef.current = migrateOldMsegShapes; }, [migrateOldMsegShapes]);
+
   const undo = useCallback(async () => {
     if (historyIndexRef.current <= 0 || !fabricRef.current) return;
     const canvas = fabricRef.current;
@@ -556,6 +618,7 @@ export default function CoverDesignerPage() {
           canvas.backgroundColor = savedBg;
           canvas.renderAll();
           isBatchingRef.current = false;
+          migrateOldMsegShapesRef.current();
           saveHistoryRef.current();
           setTimeout(() => canvas.renderAll(), 50);
         });
@@ -1972,6 +2035,7 @@ export default function CoverDesignerPage() {
         if (data.totalH) setCurrentTotalH(data.totalH);
         fabricRef.current!.renderAll();
         isBatchingRef.current = false;
+        migrateOldMsegShapesRef.current();
         saveHistoryRef.current();
       } catch {
         alert('ファイルの読み込みに失敗しました');

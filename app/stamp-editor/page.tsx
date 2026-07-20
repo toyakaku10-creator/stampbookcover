@@ -361,6 +361,7 @@ export default function StampEditorPage() {
           (canvas.loadFromJSON(parsed) as any).then(() => {
             canvas.backgroundColor = '#ffffff';
             canvas.renderAll();
+            migrateOldMsegShapesRef.current();
           });
         } catch { /* 破損データは無視 */ }
       }
@@ -757,6 +758,70 @@ export default function StampEditorPage() {
     applyDeep(obj);
     canvas.renderAll();
   }, [color, fillColor, strokeWidth]);
+
+  // ── 旧構造 mseg 図形の自動マイグレーション ─────────────────────
+  // _msegCorners はあるが Group としての子（_objects）がない古い形式を検出し再構築する
+  const migrateOldMsegShapes = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric: any = (canvas as any)._fabric;
+    if (!fabric) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const objects = canvas.getObjects() as any[];
+    let migratedCount = 0;
+
+    objects.forEach((obj: any) => {
+      // 旧構造判定: _msegCorners はあるが Group の子配列がない／空
+      const looksOld = obj._msegCorners && (!obj._objects || obj._objects.length === 0);
+      if (!looksOld) return;
+
+      const corners  = obj._msegCorners as { x: number; y: number }[];
+      const radius   = (obj._msegRadius as number) ?? 0;
+      const sides    = (obj._msegSides  as boolean[]) ?? Array(corners.length).fill(true);
+      const stroke   = (typeof obj.stroke === 'string' && obj.stroke) ? obj.stroke : '#C9A84C';
+      const sw       = obj.strokeWidth ?? 1.5;
+      const rawFill  = typeof obj.fill === 'string' ? obj.fill : '';
+      const fill     = rawFill && rawFill !== '' ? rawFill : 'transparent';
+
+      const newGroup = buildSegmentGroup(fabric, corners, radius, sides, stroke, sw, fill, {
+        left:    obj.left,    top:    obj.top,    angle:  obj.angle  ?? 0,
+        scaleX:  obj.scaleX  ?? 1,   scaleY:  obj.scaleY  ?? 1,
+        opacity: obj.opacity ?? 1,
+        originX: obj.originX ?? 'left', originY: obj.originY ?? 'top',
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._shapeType   = obj._shapeType ?? 'mseg';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._msegCorners = corners;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._msegRadius  = radius;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newGroup as any)._msegSides   = sides;
+      if (obj._trapTop !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (newGroup as any)._trapTop    = obj._trapTop;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (newGroup as any)._trapBottom = obj._trapBottom;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (newGroup as any)._trapHeight = obj._trapHeight;
+      }
+
+      canvas.remove(obj);
+      canvas.add(newGroup);
+      migratedCount++;
+    });
+
+    if (migratedCount > 0) {
+      canvas.renderAll();
+      saveHistoryRef.current();
+      console.info(`[mseg migrate] ${migratedCount}個の旧構造図形を新構造に変換しました`);
+    }
+  }, []);
+
+  const migrateOldMsegShapesRef = useRef(migrateOldMsegShapes);
+  useEffect(() => { migrateOldMsegShapesRef.current = migrateOldMsegShapes; }, [migrateOldMsegShapes]);
 
   // ── アンドゥ（イベント一時切断で saveHistory の誤発火を防ぐ） ──
   const undo = useCallback(() => {
@@ -1366,6 +1431,7 @@ export default function StampEditorPage() {
       canvas.setDimensions({ width: CANVAS_SIZE, height: CANVAS_SIZE });
       canvas.backgroundColor = bgColorRef.current;
       canvas.requestRenderAll();
+      migrateOldMsegShapesRef.current();
     });
     setSelectedStampId(stamp.id);
   }, []);

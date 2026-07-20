@@ -79,7 +79,12 @@ const CLONE_EXTRA_PROPS = [
 
 // ── 選択オブジェクトの有効プロパティを取得 ──────────────────
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getEffectiveProps(obj: any) {
+function getEffectiveProps(obj: any): { stroke: string; fill: string; strokeWidth: number } {
+  // 複数選択（activeselection）: 最初の子を代表として読む
+  if (obj?.type === 'activeselection') {
+    const children: any[] = obj.getObjects?.() ?? [];
+    return children.length > 0 ? getEffectiveProps(children[0]) : { stroke: GOLD, fill: 'transparent', strokeWidth: 1.5 };
+  }
   // mseg グループ: fill子とstroke子を区別して読む
   if (obj?.type === 'group' && obj._msegCorners) {
     const children: any[] = obj.getObjects?.() ?? [];
@@ -717,10 +722,10 @@ export default function StampEditorPage() {
     if (!obj) return;
 
     const fill = fillColor === 'transparent' ? '' : fillColor;
-    // Group の場合は子に再帰的に適用
+    // Group / activeselection の場合は子に再帰的に適用
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const applyDeep = (o: any) => {
-      if (o.type === 'group') {
+      if (o.type === 'group' || o.type === 'activeselection') {
         o.getObjects?.()?.forEach(applyDeep);
       } else if (o._isFillShape) {
         o.set({ fill }); // mseg塗りつぶし専用Polygon: fillのみ更新

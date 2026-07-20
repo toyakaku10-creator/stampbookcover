@@ -299,11 +299,16 @@ export default function StampEditorPage() {
     }
     // カスタム形状
     const st = obj._shapeType as 'trapezoid' | 'arc' | 'dot' | 'h-diamond' | 'triangle' | 'mseg' | undefined;
-    const hasMseg = !!(obj._msegCorners);
+    // 複数選択時は子の中から最初のmsegを探す
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const msegSrc: any = obj.type === 'activeselection'
+      ? (obj.getObjects?.() ?? []).find((c: any) => c._msegCorners) ?? null
+      : (obj._msegCorners ? obj : null);
+    const hasMseg = !!msegSrc;
     setIsMseg(hasMseg);
     if (hasMseg || st === 'mseg') {
-      setMsegRadius((obj._msegRadius as number) ?? 0);
-      setMsegSides([...((obj._msegSides as boolean[]) ?? [true, true, true, true])]);
+      setMsegRadius((msegSrc?._msegRadius as number) ?? 0);
+      setMsegSides([...((msegSrc?._msegSides as boolean[]) ?? [true, true, true, true])]);
     }
     if (st === 'mseg') {
       setSelectedShapeType('mseg');
@@ -725,12 +730,26 @@ export default function StampEditorPage() {
     // Group / activeselection の場合は子に再帰的に適用
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const applyDeep = (o: any) => {
-      if (o.type === 'group' || o.type === 'activeselection') {
+      if (o.type === 'activeselection') {
+        // 複数選択: 直接子に個別適用
+        (o._objects ?? o.getObjects?.() ?? []).forEach(applyDeep);
+      } else if (o._msegCorners) {
+        // mseg グループ: _objects を直接参照し opacity を保持したまま色だけ変更
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (o._objects ?? o.getObjects?.() ?? []).forEach((child: any) => {
+          if (child._isFillShape) {
+            child.set({ fill });
+          } else if (child._msegChild) {
+            // opacity は変更しない（非表示にした辺が復活しないよう）
+            child.set({ stroke: color, strokeWidth });
+          }
+        });
+      } else if (o.type === 'group') {
         o.getObjects?.()?.forEach(applyDeep);
       } else if (o._isFillShape) {
-        o.set({ fill }); // mseg塗りつぶし専用Polygon: fillのみ更新
+        o.set({ fill });
       } else if (o._msegChild) {
-        o.set({ stroke: color, strokeWidth }); // mseg辺セグメント: strokeのみ更新
+        o.set({ stroke: color, strokeWidth });
       } else {
         o.set({ stroke: color, fill, strokeWidth });
       }

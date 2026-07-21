@@ -1975,6 +1975,16 @@ export default function StampEditorPage() {
             <Upload size={12} /> 読み込み
             <input type="file" accept=".json" onChange={importStamps} style={{ display: 'none' }} />
           </label>
+          <button onClick={() => {
+            const canvas = fabricRef.current;
+            const objs = canvas?.getObjects() || [];
+            const info = objs.map((o: any, i: number) =>
+              `${i}: type=${o.type}, hasMsegCorners=${!!o._msegCorners}, objectsCount=${o._objects?.length ?? 'なし'}`
+            ).join('\n');
+            alert(info || 'オブジェクトなし');
+          }} style={{ ...S.btn(), fontSize: 11, padding: '5px 8px', gap: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            図形の構造を確認
+          </button>
 
           <div style={{ height: 1, background: 'var(--border)' }} />
           <div style={{ ...S.label, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -43,6 +43,16 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+/** rgba(r,g,b,a) 文字列を { color: '#rrggbb', alpha: number } に分解 */
+function parseRgba(s: string): { color: string; alpha: number } {
+  const m = s.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (m) {
+    const hex = '#' + [m[1], m[2], m[3]].map(v => parseInt(v).toString(16).padStart(2, '0')).join('');
+    return { color: hex, alpha: m[4] !== undefined ? parseFloat(m[4]) : 1 };
+  }
+  return { color: s || '#000000', alpha: 1 };
+}
+
 // ── サイズプリセット (mm) ─────────────────────────────────────
 type CanvasPreset = { id: string; label: string; sub: string; mmW: number; mmH: number };
 const CANVAS_PRESETS: CanvasPreset[] = [
@@ -70,7 +80,7 @@ const DEFAULT_BG = '#FFFEF0';
 
 // ── ツール定義 ────────────────────────────────────────────────
 const DRAWING_TOOLS = ['road', 'railway', 'river', 'greenarea'] as const;
-const MAP_EXTRA_PROPS = ['_mapLineType', '_isBgImage', '_mapStampId'];
+const MAP_EXTRA_PROPS = ['_mapLineType', '_isBgImage', '_mapStampId', '_anchorPoints', '_strokeId', '_mapOpts'];
 
 type MapTool = 'select' | 'road' | 'railway' | 'river' | 'greenarea' | 'stamp';
 
@@ -121,7 +131,8 @@ const INIT = computeCanvas(DEFAULT_PRESET.mmW, DEFAULT_PRESET.mmH);
 
 export default function MapEditor() {
   const router = useRouter();
-  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const canvasRef          = useRef<HTMLCanvasElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const fabricRef    = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const fabricLibRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -186,6 +197,21 @@ export default function MapEditor() {
   useEffect(() => { greenFillOpacityRef.current = greenFillOpacity; }, [greenFillOpacity]);
   useEffect(() => { greenStrokeRef.current      = greenStroke;      }, [greenStroke]);
   useEffect(() => { greenStrokeWRef.current     = greenStrokeW;     }, [greenStrokeW]);
+
+  // ── 選択オブジェクトのプロパティ編集 ──────────────────────
+  const [hasMapSel,  setHasMapSel]  = useState(false);
+  const [selType,    setSelType]    = useState('');
+  const [selCount,   setSelCount]   = useState(0);
+  const [selStroke,  setSelStroke]  = useState('#C8B89A');
+  const [selStrokeW, setSelStrokeW] = useState(8);
+  const [selFill,    setSelFill]    = useState('#B0D4E8');
+  const [selFillOp,  setSelFillOp]  = useState(0.4);
+  const [selJitter,  setSelJitter]  = useState(3);
+
+  const selFillRef   = useRef('#B0D4E8');
+  const selFillOpRef = useRef(0.4);
+  useEffect(() => { selFillRef.current   = selFill;   }, [selFill]);
+  useEffect(() => { selFillOpRef.current = selFillOp; }, [selFillOp]);
 
   // ── キャンバスサイズ (mm) ──────────────────────────────────
   const [canvasPresetId, setCanvasPresetId] = useState(DEFAULT_PRESET.id);
@@ -400,10 +426,18 @@ export default function MapEditor() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let objs: any[] = [];
       if (tool === 'road') {
-        objs = buildRoadObjects(fabric, pts, {
+        const roadObjs = buildRoadObjects(fabric, pts, {
           color: lineColorRef.current, strokeWidth: strokeWidthRef.current,
           jitter: jitterAmtRef.current, doubleStroke: roadDoubleRef.current,
         });
+        if (roadObjs.length > 1) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const grp: any = new fabric.Group(roadObjs, { selectable: true });
+          grp._mapLineType = 'road';
+          objs = [grp];
+        } else {
+          objs = roadObjs;
+        }
       } else if (tool === 'railway') {
         objs = [buildRailwayObjects(fabric, pts, {
           color: lineColorRef.current, railWidth: 2, jitter: jitterAmtRef.current,
@@ -423,6 +457,22 @@ export default function MapEditor() {
         });
         if (g) objs = [g];
       }
+      // アンカー点・オプションをオブジェクトに付与（後からプロパティ編集に使用）
+      const strokeId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let mapOpts: any = {};
+      if (tool === 'road') mapOpts = { color: lineColorRef.current, strokeWidth: strokeWidthRef.current, doubleStroke: roadDoubleRef.current };
+      else if (tool === 'railway') mapOpts = { color: lineColorRef.current, railGap: railGapRef.current, sleeperGap: sleeperGapRef.current };
+      else if (tool === 'river') mapOpts = { fillColor: riverFillRef.current, strokeColor: riverStrokeRef.current, width: riverWidthRef.current };
+      else if (tool === 'greenarea') mapOpts = { fillColor: greenFillRef.current, fillOpacity: greenFillOpacityRef.current, strokeColor: greenStrokeRef.current, strokeWidth: greenStrokeWRef.current };
+      objs.forEach(o => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (o as any)._anchorPoints = [...pts];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (o as any)._strokeId    = strokeId;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (o as any)._mapOpts     = JSON.stringify(mapOpts);
+      });
       objs.forEach(o => canvas.add(o));
       canvas.renderAll();
       saveHistory();
@@ -439,6 +489,173 @@ export default function MapEditor() {
     setAnchorCount(0);
     canvas?.renderAll();
   }, []);
+
+  // ── 選択オブジェクトのプロパティ読み取り ─────────────────
+  const syncSelProps = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const active = (canvas.getActiveObjects() as any[]).filter((o: any) => o._mapLineType);
+    if (active.length === 0) { setHasMapSel(false); return; }
+
+    setHasMapSel(true);
+    setSelCount(active.length);
+    const first = active[0];
+    const lt: string = first._mapLineType;
+    setSelType(lt);
+
+    if (lt === 'road') {
+      // Road は単一 Path または Group（doubleStroke）
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const src = first.type === 'group' ? (first.getObjects?.() as any[])[0] : first;
+      setSelStroke(src?.stroke || '#C8B89A');
+      setSelStrokeW(src?.strokeWidth || 8);
+    } else if (lt === 'railway') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const children: any[] = first.getObjects?.() || [];
+      setSelStroke(children[0]?.stroke || '#555555');
+    } else if (lt === 'river') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const children: any[] = first.getObjects?.() || [];
+      const body = children[0]; // 水面（太いストローク）
+      const bank = children[1]; // 岸線
+      if (body) {
+        const parsed = parseRgba(typeof body.fill === 'string' ? body.fill : '');
+        setSelFill(parsed.color); selFillRef.current = parsed.color;
+        setSelFillOp(parsed.alpha); selFillOpRef.current = parsed.alpha;
+        setSelStrokeW(body.strokeWidth || 20);
+      }
+      if (bank) setSelStroke(bank.stroke || '#7BAEC8');
+    } else if (lt === 'greenarea') {
+      const parsed = parseRgba(typeof first.fill === 'string' ? first.fill : '');
+      setSelFill(parsed.color); selFillRef.current = parsed.color;
+      setSelFillOp(parsed.alpha); selFillOpRef.current = parsed.alpha;
+      setSelStroke(first.stroke || '#4A8A3C');
+      setSelStrokeW(first.strokeWidth || 2);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const jitter = (first as any)._mapOpts ? (() => { try { return JSON.parse((first as any)._mapOpts)?.jitter ?? jitterAmtRef.current; } catch { return jitterAmtRef.current; } })() : jitterAmtRef.current;
+    setSelJitter(jitter);
+  }, []);
+
+  /** 選択オブジェクトの線色を変更 */
+  const applySelStroke = useCallback((color: string) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (canvas.getActiveObjects() as any[]).filter((o: any) => o._mapLineType).forEach((obj: any) => {
+      const lt: string = obj._mapLineType;
+      if (lt === 'road') {
+        if (obj.type === 'group') (obj.getObjects?.() || []).forEach((c: any) => c.set({ stroke: color }));
+        else obj.set({ stroke: color });
+      } else if (lt === 'railway') {
+        (obj.getObjects?.() || []).forEach((c: any) => c.set({ stroke: color }));
+      } else if (lt === 'river') {
+        const ch: any[] = obj.getObjects?.() || [];
+        [ch[1], ch[2]].filter(Boolean).forEach((c: any) => c.set({ stroke: color }));
+      } else if (lt === 'greenarea') {
+        obj.set({ stroke: color });
+      }
+      try { const o = JSON.parse(obj._mapOpts || '{}'); obj._mapOpts = JSON.stringify({ ...o, color, strokeColor: color }); } catch { /* */ }
+    });
+    setSelStroke(color);
+    canvas.renderAll();
+    saveHistory();
+  }, [saveHistory]);
+
+  /** 選択オブジェクトの線幅を変更（road・greenarea） */
+  const applySelStrokeW = useCallback((w: number) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (canvas.getActiveObjects() as any[]).filter((o: any) => o._mapLineType).forEach((obj: any) => {
+      const lt: string = obj._mapLineType;
+      if (lt === 'road') {
+        if (obj.type === 'group') (obj.getObjects?.() || []).forEach((c: any) => c.set({ strokeWidth: w }));
+        else obj.set({ strokeWidth: w });
+      } else if (lt === 'greenarea') {
+        obj.set({ strokeWidth: w });
+      } else if (lt === 'river') {
+        const ch: any[] = obj.getObjects?.() || [];
+        if (ch[0]) ch[0].set({ strokeWidth: w }); // body width
+      }
+      try { const o = JSON.parse(obj._mapOpts || '{}'); obj._mapOpts = JSON.stringify({ ...o, strokeWidth: w, width: w }); } catch { /* */ }
+    });
+    setSelStrokeW(w);
+    canvas.renderAll();
+    saveHistory();
+  }, [saveHistory]);
+
+  /** 選択オブジェクトの塗り色・不透明度を変更（river・greenarea） */
+  const applySelFillColor = useCallback((color: string, opacity: number) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const rgba = hexToRgba(color, opacity);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (canvas.getActiveObjects() as any[]).filter((o: any) => o._mapLineType).forEach((obj: any) => {
+      const lt: string = obj._mapLineType;
+      if (lt === 'river') {
+        const ch: any[] = obj.getObjects?.() || [];
+        if (ch[0]) ch[0].set({ fill: rgba });
+      } else if (lt === 'greenarea') {
+        obj.set({ fill: rgba });
+      }
+      try { const o = JSON.parse(obj._mapOpts || '{}'); obj._mapOpts = JSON.stringify({ ...o, fillColor: color, fillOpacity: opacity }); } catch { /* */ }
+    });
+    canvas.renderAll();
+    saveHistory();
+  }, [saveHistory]);
+
+  /** 選択オブジェクトのジッターを変更（パスを再構築） */
+  const applySelJitter = useCallback((jitter: number) => {
+    const canvas = fabricRef.current;
+    const fabric = fabricLibRef.current;
+    if (!canvas || !fabric) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const active = (canvas.getActiveObjects() as any[]).filter((o: any) => o._mapLineType && o._anchorPoints);
+    if (active.length === 0) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const internalObjs = (canvas as any)._objects as any[];
+
+    active.forEach(oldObj => {
+      const idx = internalObjs.indexOf(oldObj);
+      if (idx === -1) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pts: Point[]  = (oldObj as any)._anchorPoints;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const lt: string    = (oldObj as any)._mapLineType;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sid: string   = (oldObj as any)._strokeId || '';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const opts: any     = (() => { try { return JSON.parse((oldObj as any)._mapOpts || '{}'); } catch { return {}; } })();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let newObj: any = null;
+      if (lt === 'road') {
+        const roadObjs = buildRoadObjects(fabric, pts, { color: opts.color || lineColorRef.current, strokeWidth: opts.strokeWidth || strokeWidthRef.current, jitter, doubleStroke: opts.doubleStroke || false });
+        if (roadObjs.length > 1) { newObj = new fabric.Group(roadObjs, { selectable: true }); newObj._mapLineType = 'road'; }
+        else newObj = roadObjs[0];
+      } else if (lt === 'railway') {
+        newObj = buildRailwayObjects(fabric, pts, { color: opts.color || lineColorRef.current, railWidth: 2, jitter, railGap: opts.railGap || railGapRef.current, sleeperGap: opts.sleeperGap || sleeperGapRef.current });
+      } else if (lt === 'river') {
+        newObj = buildRiverObjects(fabric, pts, { fillColor: opts.fillColor || riverFillRef.current, strokeColor: opts.strokeColor || riverStrokeRef.current, width: opts.width || riverWidthRef.current, jitter });
+      } else if (lt === 'greenarea') {
+        newObj = buildGreenAreaObjects(fabric, pts, { fillColor: hexToRgba(opts.fillColor || greenFillRef.current, opts.fillOpacity ?? greenFillOpacityRef.current), strokeColor: opts.strokeColor || greenStrokeRef.current, strokeWidth: opts.strokeWidth || greenStrokeWRef.current, jitter });
+      }
+      if (!newObj) return;
+      newObj._anchorPoints = pts;
+      newObj._strokeId    = sid;
+      newObj._mapOpts     = JSON.stringify({ ...opts, jitter });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newObj as any).canvas = canvas;
+      internalObjs.splice(idx, 1, newObj);
+    });
+
+    canvas.discardActiveObject();
+    canvas.renderAll();
+    setSelJitter(jitter);
+    saveHistory();
+  }, [saveHistory]);
 
   // ── キャンバスサイズ変更 ───────────────────────────────────
   const applyCanvasSize = useCallback((mmW: number, mmH: number) => {
@@ -506,6 +723,26 @@ export default function MapEditor() {
       });
       fabricRef.current = canvas;
 
+      // コンテナサイズに合わせた初期表示サイズ計算
+      requestAnimationFrame(() => {
+        const container = canvasContainerRef.current;
+        if (!container) return;
+        const availW = Math.max(200, container.clientWidth - 40);
+        const availH = Math.max(200, container.clientHeight - 40);
+        const rawW = (canvasMmWRef.current * DISPLAY_DPI) / 25.4;
+        const rawH = (canvasMmHRef.current * DISPLAY_DPI) / 25.4;
+        const fit = Math.min(availW / rawW, availH / rawH, 1.0);
+        const pxW = Math.round(rawW * fit);
+        const pxH = Math.round(rawH * fit);
+        const mult = (PRINT_DPI / DISPLAY_DPI) / fit;
+        if (pxW !== canvasPxWRef.current || pxH !== canvasPxHRef.current) {
+          canvas.setDimensions({ width: pxW, height: pxH });
+          canvasPxWRef.current = pxW; canvasPxHRef.current = pxH;
+          exportMultRef.current = mult;
+          setPxInfo({ pxW, pxH, mult });
+        }
+      });
+
       // mouse:up: アンカー追加 or スタンプ配置
       canvas.on('mouse:up', (opt: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         const tool = mapToolRef.current;
@@ -555,11 +792,17 @@ export default function MapEditor() {
         }
       });
 
-      // ?edit=<id> URL param: load saved map
+      // 選択イベント
+      canvas.on('selection:created', syncSelProps);
+      canvas.on('selection:updated', syncSelProps);
+      canvas.on('selection:cleared', () => setHasMapSel(false));
+
       const editId = typeof window !== 'undefined'
         ? new URLSearchParams(window.location.search).get('edit')
         : null;
+
       if (editId) {
+        // ?edit=<id> URL param: load saved map
         const saved = getMap(editId);
         if (saved) {
           setEditingMapId(editId);
@@ -574,32 +817,80 @@ export default function MapEditor() {
             canvasMmWRef.current = saved.mmW; canvasMmHRef.current = saved.mmH;
             setCanvasMmW(saved.mmW); setCanvasMmH(saved.mmH); setPxInfo(c);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             bgImageObjRef.current = canvas.getObjects().find((o: any) => o._isBgImage) ?? null;
             setHasBgImage(!!bgImageObjRef.current);
             canvas.renderAll();
           });
           return; // skip normal initial history save
         }
+      } else {
+        const stored = localStorage.getItem('mapeditor-canvas-state');
+        if (stored) {
+          try {
+            const { json, bgColor: savedBg, mmW: savedMmW, mmH: savedMmH } = JSON.parse(stored);
+            if (savedMmW && savedMmH) {
+              const c = computeCanvas(savedMmW, savedMmH);
+              canvas.setDimensions({ width: c.pxW, height: c.pxH });
+              canvasPxWRef.current = c.pxW; canvasPxHRef.current = c.pxH;
+              exportMultRef.current = c.mult;
+              canvasMmWRef.current = savedMmW; canvasMmHRef.current = savedMmH;
+              setCanvasMmW(savedMmW); setCanvasMmH(savedMmH); setPxInfo(c);
+            }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (canvas.loadFromJSON(json) as any).then(() => {
+              canvas.backgroundColor = savedBg || DEFAULT_BG;
+              setBgColor(savedBg || DEFAULT_BG);
+              bgColorRef.current = savedBg || DEFAULT_BG;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const restoredBg = canvas.getObjects().find((o: any) => o._isBgImage) ?? null;
+              bgImageObjRef.current = restoredBg;
+              setHasBgImage(!!restoredBg);
+              if (restoredBg) {
+                const locked = !restoredBg.selectable;
+                setBgLocked(locked); bgLockedRef.current = locked;
+                const aspect = !!restoredBg.lockUniScaling;
+                setBgAspectLock(aspect); bgAspectLockRef.current = aspect;
+                const pct = Math.round((restoredBg.scaleX || 1) * 100);
+                setBgScalePct(pct); setBgScaleInput(String(pct));
+                setBgOpacity(restoredBg.opacity ?? 0.4);
+                bgOpacityRef.current = restoredBg.opacity ?? 0.4;
+              }
+              canvas.renderAll();
+              saveHistory();
+            });
+          } catch {
+            // Fall through to normal empty init
+            const initial = { json: canvas.toJSON(MAP_EXTRA_PROPS), bgColor: bgColorRef.current, mmW: canvasMmWRef.current, mmH: canvasMmHRef.current };
+            historyRef.current = [JSON.stringify(initial)];
+            historyIdxRef.current = 0;
+          }
+        } else {
+          // normal empty init
+          const initial = { json: canvas.toJSON(MAP_EXTRA_PROPS), bgColor: bgColorRef.current, mmW: canvasMmWRef.current, mmH: canvasMmHRef.current };
+          historyRef.current = [JSON.stringify(initial)];
+          historyIdxRef.current = 0;
+        }
       }
-      // normal initial history
-      const initial = {
-        json:    canvas.toJSON(MAP_EXTRA_PROPS),
-        bgColor: bgColorRef.current,
-        mmW:     canvasMmWRef.current,
-        mmH:     canvasMmHRef.current,
-      };
-      historyRef.current    = [JSON.stringify(initial)];
-      historyIdxRef.current = 0;
     });
 
     return () => {
       disposed = true;
+      try {
+        if (canvas) {
+          const state = JSON.stringify({
+            json: canvas.toJSON(MAP_EXTRA_PROPS),
+            bgColor: bgColorRef.current,
+            mmW: canvasMmWRef.current,
+            mmH: canvasMmHRef.current,
+          });
+          localStorage.setItem('mapeditor-canvas-state', state);
+        }
+      } catch { /* ignore */ }
       try { canvas?.dispose(); } catch { /* ignore */ }
       fabricRef.current    = null;
       fabricLibRef.current = null;
     };
-  }, [saveHistory, updatePreview]);
+  }, [saveHistory, updatePreview, syncSelProps]);
 
   // ── ツール切替 ────────────────────────────────────────────
   useEffect(() => {
@@ -791,7 +1082,7 @@ export default function MapEditor() {
         </div>
 
         {/* ── キャンバスエリア ─────────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center',
+        <div ref={canvasContainerRef} style={{ flex: 1, display: 'flex', alignItems: 'center',
                       justifyContent: 'center', overflow: 'auto', padding: 20 }}>
           <div style={{ boxShadow: '0 2px 18px rgba(0,0,0,0.2)', display: 'inline-block' }}>
             <canvas ref={canvasRef} />
@@ -1051,11 +1342,86 @@ export default function MapEditor() {
           )}
 
           {/* 選択モード */}
-          {mapTool === 'select' && (
+          {mapTool === 'select' && !hasMapSel && (
             <div style={{ fontSize: 11, color: '#888', lineHeight: 1.7 }}>
               オブジェクトを選択して<br />移動・削除できます。<br />
               <span style={{ color: 'var(--accent)' }}>Delete</span> キーで削除
             </div>
+          )}
+
+          {/* 選択オブジェクト プロパティ編集 */}
+          {mapTool === 'select' && hasMapSel && (
+            <>
+              <div style={S.sectionHead}>
+                {({ road: '道路', railway: '線路', river: '川', greenarea: '緑地' } as Record<string,string>)[selType] ?? selType}
+                {selCount > 1 && <span style={{ fontWeight: 400, color: '#888' }}> × {selCount}</span>}
+              </div>
+
+              {/* 線の色 */}
+              <div>
+                <div style={S.lbl}>線の色</div>
+                <input type="color" value={selStroke}
+                  onChange={e => { setSelStroke(e.target.value); applySelStroke(e.target.value); }}
+                  style={{ width: '100%', height: 28, borderRadius: 5 }} />
+              </div>
+
+              {/* 線の太さ (road / greenarea / river-width) */}
+              {(selType === 'road' || selType === 'greenarea') && (
+                <div>
+                  <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>線の太さ</span><span style={{ color: 'var(--accent)' }}>{selStrokeW}px</span>
+                  </div>
+                  <input type="range" min={1} max={30} step={1} value={selStrokeW}
+                    onChange={e => { setSelStrokeW(Number(e.target.value)); applySelStrokeW(Number(e.target.value)); }}
+                    style={{ width: '100%' }} />
+                </div>
+              )}
+              {selType === 'river' && (
+                <div>
+                  <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>川幅</span><span style={{ color: 'var(--accent)' }}>{selStrokeW}px</span>
+                  </div>
+                  <input type="range" min={6} max={60} step={2} value={selStrokeW}
+                    onChange={e => { setSelStrokeW(Number(e.target.value)); applySelStrokeW(Number(e.target.value)); }}
+                    style={{ width: '100%' }} />
+                </div>
+              )}
+
+              {/* 塗り (river / greenarea) */}
+              {(selType === 'river' || selType === 'greenarea') && (
+                <>
+                  <div>
+                    <div style={S.lbl}>塗りの色</div>
+                    <input type="color" value={selFill}
+                      onChange={e => { setSelFill(e.target.value); selFillRef.current = e.target.value; applySelFillColor(e.target.value, selFillOpRef.current); }}
+                      style={{ width: '100%', height: 28, borderRadius: 5 }} />
+                  </div>
+                  <div>
+                    <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>塗りの透明度</span>
+                      <span style={{ color: 'var(--accent)' }}>{Math.round(selFillOp * 100)}%</span>
+                    </div>
+                    <input type="range" min={0} max={1} step={0.05} value={selFillOp}
+                      onChange={e => { const v = Number(e.target.value); setSelFillOp(v); selFillOpRef.current = v; applySelFillColor(selFillRef.current, v); }}
+                      style={{ width: '100%' }} />
+                  </div>
+                </>
+              )}
+
+              {/* ジッター（再構築が必要なため mouseUp で適用） */}
+              <div>
+                <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>手ブレ量</span><span style={{ color: 'var(--accent)' }}>{selJitter}px</span>
+                </div>
+                <input type="range" min={0} max={10} step={0.5} value={selJitter}
+                  onChange={e => setSelJitter(Number(e.target.value))}
+                  onMouseUp={e => applySelJitter(Number((e.target as HTMLInputElement).value))}
+                  onTouchEnd={e => applySelJitter(Number((e.target as HTMLInputElement).value))}
+                  style={{ width: '100%' }} />
+                <div style={{ fontSize: 9, color: '#888', textAlign: 'right' }}>マウスを離すと適用</div>
+              </div>
+              <div style={S.divider} />
+            </>
           )}
 
           {/* ════ 下絵（背景画像） ════ */}

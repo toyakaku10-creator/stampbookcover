@@ -13,20 +13,39 @@ import {
   type Point,
 } from '@/lib/handDrawnPath';
 
-// ── キャンバスサイズプリセット ────────────────────────────────
-type CanvasPreset = { id: string; label: string; sub: string; w: number; h: number };
-const CANVAS_PRESETS: CanvasPreset[] = [
-  { id: 'square',  label: '正方形',     sub: '600 × 600',  w: 600, h: 600 },
-  { id: 'land43',  label: '横長 4:3',   sub: '640 × 480',  w: 640, h: 480 },
-  { id: 'land169', label: '横長 16:9',  sub: '720 × 405',  w: 720, h: 405 },
-  { id: 'port',    label: '縦長 3:4',   sub: '480 × 640',  w: 480, h: 640 },
-  { id: 'a4p',     label: 'A4 縦',      sub: '500 × 707',  w: 500, h: 707 },
-  { id: 'a4l',     label: 'A4 横',      sub: '707 × 500',  w: 707, h: 500 },
-  { id: 'custom',  label: 'カスタム',   sub: '自由設定',   w: 700, h: 500 },
-];
-const DEFAULT_PRESET = CANVAS_PRESETS[1]; // 横長 4:3
+// ── DPI 変換 ─────────────────────────────────────────────────
+// 表示キャンバスは 72 DPI で作成。書き出し時に 300 DPI 相当まで拡大する。
+const DISPLAY_DPI = 72;
+const PRINT_DPI   = 300;
+const MAX_PX_W    = 820; // 表示エリアに収まる最大幅
+const MAX_PX_H    = 560; // 表示エリアに収まる最大高
 
-// ── 背景色プリセット ──────────────────────────────────────────
+/** mm → 表示px への変換 + 書き出し倍率を返す */
+function computeCanvas(mmW: number, mmH: number) {
+  const rawW = (mmW * DISPLAY_DPI) / 25.4;
+  const rawH = (mmH * DISPLAY_DPI) / 25.4;
+  // 画面に収まるようにスケールダウン（1.0 以下に制限）
+  const fit  = Math.min(MAX_PX_W / rawW, MAX_PX_H / rawH, 1.0);
+  const pxW  = Math.round(rawW * fit);
+  const pxH  = Math.round(rawH * fit);
+  // 書き出し倍率: (300 DPI / 72 DPI) / fitScale = 300 DPI 相当
+  const mult = (PRINT_DPI / DISPLAY_DPI) / fit;
+  return { pxW, pxH, mult };
+}
+
+// ── サイズプリセット (mm) ──────────────────────────────────
+type CanvasPreset = { id: string; label: string; sub: string; mmW: number; mmH: number };
+const CANVAS_PRESETS: CanvasPreset[] = [
+  { id: 'bookcover', label: 'ブックカバー', sub: '385 × 152 mm',   mmW: 385, mmH: 152 },
+  { id: 'a4p',       label: 'A4 縦',        sub: '210 × 297 mm',   mmW: 210, mmH: 297 },
+  { id: 'a4l',       label: 'A4 横',        sub: '297 × 210 mm',   mmW: 297, mmH: 210 },
+  { id: 'b5p',       label: 'B5 縦',        sub: '182 × 257 mm',   mmW: 182, mmH: 257 },
+  { id: 'square',    label: '正方形',        sub: '200 × 200 mm',   mmW: 200, mmH: 200 },
+  { id: 'custom',    label: 'カスタム',      sub: 'mm で直接入力',  mmW: 200, mmH: 200 },
+];
+const DEFAULT_PRESET = CANVAS_PRESETS[0]; // ブックカバー
+
+// ── 背景色プリセット ─────────────────────────────────────────
 const BG_COLOR_PRESETS = [
   { label: '白',         color: '#FFFFFF' },
   { label: 'クリーム',   color: '#FFFEF0' },
@@ -39,13 +58,12 @@ const BG_COLOR_PRESETS = [
 ];
 const DEFAULT_BG = '#F5F0E8';
 
-// ── 描画ツール識別 ────────────────────────────────────────────
 const DRAWING_TOOLS = ['road', 'railway', 'river'] as const;
 const MAP_EXTRA_PROPS = ['_mapLineType', '_isBgImage', '_mapStampId'];
 
 type MapTool = 'select' | 'road' | 'railway' | 'river' | 'stamp';
 
-// ── スタイル定数 ─────────────────────────────────────────────
+// ── スタイル ─────────────────────────────────────────────────
 const S = {
   toolBtn: (active: boolean): React.CSSProperties => ({
     width: 40, height: 40, borderRadius: 8, border: 'none',
@@ -55,53 +73,52 @@ const S = {
     flexShrink: 0,
   }),
   panel: {
-    width: 228, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 9,
+    width: 228, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8,
     overflowY: 'auto', flexShrink: 0,
   } as React.CSSProperties,
-  lbl: {
-    fontSize: 10, color: '#888', fontWeight: 700, letterSpacing: 0.4, marginBottom: 2,
-  } as React.CSSProperties,
-  sectionHead: {
-    fontSize: 11, color: 'var(--accent)', fontWeight: 700, marginBottom: 2,
-  } as React.CSSProperties,
+  sectionHead: { fontSize: 11, color: 'var(--accent)', fontWeight: 700 } as React.CSSProperties,
+  lbl: { fontSize: 10, color: '#888', fontWeight: 700, letterSpacing: 0.4, marginBottom: 2 } as React.CSSProperties,
   input: {
     background: 'var(--bg)', border: '1px solid var(--border)',
     borderRadius: 5, color: 'var(--text)', padding: '3px 6px', fontSize: 12,
   } as React.CSSProperties,
-  btn: (variant?: 'accent' | 'ghost-danger'): React.CSSProperties => ({
+  btn: (v?: 'accent' | 'ghost-danger'): React.CSSProperties => ({
     width: '100%', padding: '6px 0', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontWeight: 600,
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-    ...(variant === 'accent'
+    ...(v === 'accent'
       ? { background: 'var(--accent)', color: '#0F2340', border: 'none' }
-      : variant === 'ghost-danger'
+      : v === 'ghost-danger'
       ? { background: 'transparent', color: '#C0392B', border: '1px solid #C0392B' }
       : { background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)' }),
   }),
   divider: { height: 1, background: 'var(--border)', flexShrink: 0 } as React.CSSProperties,
 };
 
-// ── ツールアイコン ────────────────────────────────────────────
-const RoadIcon    = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}><line x1="2" y1="7" x2="18" y2="7" /><line x1="2" y1="13" x2="18" y2="13" /></svg>;
-const RailwayIcon = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6}><line x1="4" y1="4" x2="4" y2="16" /><line x1="16" y1="4" x2="16" y2="16" /><line x1="4" y1="7" x2="16" y2="7" /><line x1="4" y1="10" x2="16" y2="10" /><line x1="4" y1="13" x2="16" y2="13" /></svg>;
-const RiverIcon   = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M2 7 Q5 5 8 7 Q11 9 14 7 Q17 5 18 7" /><path d="M2 13 Q5 11 8 13 Q11 15 14 13 Q17 11 18 13" /></svg>;
-const StampIcon   = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6}><circle cx="10" cy="8" r="4.5" /><rect x="6" y="14" width="8" height="2.5" rx="1" /><line x1="10" y1="12.5" x2="10" y2="14" /></svg>;
+// ── アイコン ─────────────────────────────────────────────────
+const RoadIcon    = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}><line x1="2" y1="7" x2="18" y2="7"/><line x1="2" y1="13" x2="18" y2="13"/></svg>;
+const RailwayIcon = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6}><line x1="4" y1="4" x2="4" y2="16"/><line x1="16" y1="4" x2="16" y2="16"/><line x1="4" y1="7" x2="16" y2="7"/><line x1="4" y1="10" x2="16" y2="10"/><line x1="4" y1="13" x2="16" y2="13"/></svg>;
+const RiverIcon   = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M2 7 Q5 5 8 7 Q11 9 14 7 Q17 5 18 7"/><path d="M2 13 Q5 11 8 13 Q11 15 14 13 Q17 11 18 13"/></svg>;
+const StampIcon   = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6}><circle cx="10" cy="8" r="4.5"/><rect x="6" y="14" width="8" height="2.5" rx="1"/><line x1="10" y1="12.5" x2="10" y2="14"/></svg>;
+
+// ── 初期値計算 ────────────────────────────────────────────────
+const INIT_CANVAS = computeCanvas(DEFAULT_PRESET.mmW, DEFAULT_PRESET.mmH);
 
 export default function MapEditor() {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const fabricRef    = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const fabricLibRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  // ── ツール ──────────────────────────────────────────────────
+  // ── ツール ─────────────────────────────────────────────────
   const [mapTool, setMapTool] = useState<MapTool>('select');
   const mapToolRef = useRef<MapTool>('select');
   useEffect(() => { mapToolRef.current = mapTool; }, [mapTool]);
 
-  // ── アンカー点（描画モード） ────────────────────────────────
+  // ── アンカー点 ─────────────────────────────────────────────
   const anchorPointsRef = useRef<Point[]>([]);
   const [anchorCount, setAnchorCount] = useState(0);
   const previewObjsRef = useRef<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  // ── 線プロパティ ────────────────────────────────────────────
+  // ── 線プロパティ ───────────────────────────────────────────
   const [lineColor,   setLineColor]   = useState('#C8B89A');
   const [strokeWidth, setStrokeWidth] = useState(8);
   const [jitterAmt,   setJitterAmt]   = useState(3);
@@ -132,23 +149,29 @@ export default function MapEditor() {
   useEffect(() => { riverFillRef.current   = riverFill;   }, [riverFill]);
   useEffect(() => { riverStrokeRef.current = riverStroke; }, [riverStroke]);
 
-  // ── キャンバスサイズ ────────────────────────────────────────
+  // ── キャンバスサイズ (mm) ──────────────────────────────────
   const [canvasPresetId, setCanvasPresetId] = useState(DEFAULT_PRESET.id);
-  const [canvasW, setCanvasW] = useState(DEFAULT_PRESET.w);
-  const [canvasH, setCanvasH] = useState(DEFAULT_PRESET.h);
-  const [customW, setCustomW] = useState(String(DEFAULT_PRESET.w));
-  const [customH, setCustomH] = useState(String(DEFAULT_PRESET.h));
-  const canvasWRef = useRef(DEFAULT_PRESET.w);
-  const canvasHRef = useRef(DEFAULT_PRESET.h);
-  useEffect(() => { canvasWRef.current = canvasW; }, [canvasW]);
-  useEffect(() => { canvasHRef.current = canvasH; }, [canvasH]);
+  const [canvasMmW, setCanvasMmW] = useState(DEFAULT_PRESET.mmW);
+  const [canvasMmH, setCanvasMmH] = useState(DEFAULT_PRESET.mmH);
+  const [customMmW, setCustomMmW] = useState(String(DEFAULT_PRESET.mmW));
+  const [customMmH, setCustomMmH] = useState(String(DEFAULT_PRESET.mmH));
+  // 表示用の px 情報（ラベル表示に使う）
+  const [pxInfo, setPxInfo] = useState(INIT_CANVAS);
 
-  // ── 背景色 ──────────────────────────────────────────────────
+  const canvasMmWRef = useRef(DEFAULT_PRESET.mmW);
+  const canvasMmHRef = useRef(DEFAULT_PRESET.mmH);
+  const canvasPxWRef = useRef(INIT_CANVAS.pxW);
+  const canvasPxHRef = useRef(INIT_CANVAS.pxH);
+  const exportMultRef = useRef(INIT_CANVAS.mult);
+
+  useEffect(() => { canvasMmWRef.current = canvasMmW; }, [canvasMmW]);
+  useEffect(() => { canvasMmHRef.current = canvasMmH; }, [canvasMmH]);
+
+  // ── 背景色 ─────────────────────────────────────────────────
   const [bgColor, setBgColor] = useState(DEFAULT_BG);
   const bgColorRef = useRef(DEFAULT_BG);
   useEffect(() => { bgColorRef.current = bgColor; }, [bgColor]);
 
-  // bgColor 変更 → キャンバスに即時反映
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -156,34 +179,38 @@ export default function MapEditor() {
     canvas.renderAll();
   }, [bgColor]);
 
-  // ── 背景画像 ────────────────────────────────────────────────
+  // ── 背景画像 ───────────────────────────────────────────────
   const [bgOpacity,  setBgOpacity]  = useState(0.4);
   const [hasBgImage, setHasBgImage] = useState(false);
   const bgOpacityRef  = useRef(0.4);
   const bgImageObjRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   useEffect(() => { bgOpacityRef.current = bgOpacity; }, [bgOpacity]);
-
   useEffect(() => {
     if (!bgImageObjRef.current || !fabricRef.current) return;
     bgImageObjRef.current.set({ opacity: bgOpacity });
     fabricRef.current.renderAll();
   }, [bgOpacity]);
 
-  // ── スタンプ ────────────────────────────────────────────────
+  // ── スタンプ ───────────────────────────────────────────────
   const [stamps,        setStamps]        = useState<Stamp[]>([]);
   const [selectedStamp, setSelectedStamp] = useState<Stamp | null>(null);
   const selectedStampRef = useRef<Stamp | null>(null);
   useEffect(() => { selectedStampRef.current = selectedStamp; }, [selectedStamp]);
   useEffect(() => { setStamps(getStamps()); }, []);
 
-  // ── 履歴 ────────────────────────────────────────────────────
+  // ── 履歴 ───────────────────────────────────────────────────
   const historyRef    = useRef<string[]>([]);
   const historyIdxRef = useRef(0);
 
   const saveHistory = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const state = { json: canvas.toJSON(MAP_EXTRA_PROPS), bgColor: bgColorRef.current };
+    const state = {
+      json:    canvas.toJSON(MAP_EXTRA_PROPS),
+      bgColor: bgColorRef.current,
+      mmW:     canvasMmWRef.current,
+      mmH:     canvasMmHRef.current,
+    };
     historyRef.current = historyRef.current.slice(0, historyIdxRef.current + 1);
     historyRef.current.push(JSON.stringify(state));
     historyIdxRef.current = historyRef.current.length - 1;
@@ -195,7 +222,20 @@ export default function MapEditor() {
     const canvas = fabricRef.current;
     if (!canvas) return;
     try {
-      const { json, bgColor: savedBg } = JSON.parse(historyRef.current[historyIdxRef.current]);
+      const { json, bgColor: savedBg, mmW, mmH } =
+        JSON.parse(historyRef.current[historyIdxRef.current]);
+      if (mmW && mmH) {
+        const { pxW, pxH, mult } = computeCanvas(mmW, mmH);
+        canvas.setDimensions({ width: pxW, height: pxH });
+        canvasPxWRef.current  = pxW;
+        canvasPxHRef.current  = pxH;
+        exportMultRef.current = mult;
+        canvasMmWRef.current  = mmW;
+        canvasMmHRef.current  = mmH;
+        setCanvasMmW(mmW);
+        setCanvasMmH(mmH);
+        setPxInfo({ pxW, pxH, mult });
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (canvas.loadFromJSON(json) as any).then(() => {
         canvas.backgroundColor = savedBg ?? bgColorRef.current;
@@ -205,10 +245,10 @@ export default function MapEditor() {
         setHasBgImage(!!bgImageObjRef.current);
         canvas.renderAll();
       });
-    } catch { /* 破損データは無視 */ }
+    } catch { /* ignore */ }
   }, []);
 
-  // ── プレビュー更新 ─────────────────────────────────────────
+  // ── プレビュー ─────────────────────────────────────────────
   const updatePreview = useCallback((mousePt?: Point) => {
     const canvas = fabricRef.current;
     const fabric = fabricLibRef.current;
@@ -238,8 +278,7 @@ export default function MapEditor() {
 
     const previewPts = mousePt ? [...pts, mousePt] : pts;
     if (previewPts.length >= 2) {
-      const d = jitteredBezierPathStr(previewPts, 0);
-      const path = new fabric.Path(d, previewStyle);
+      const path = new fabric.Path(jitteredBezierPathStr(previewPts, 0), previewStyle);
       previewObjsRef.current.push(path);
       canvas.add(path);
     } else if (pts.length === 1 && mousePt) {
@@ -274,8 +313,7 @@ export default function MapEditor() {
         });
       } else if (tool === 'railway') {
         objs = [buildRailwayObjects(fabric, pts, {
-          color: lineColorRef.current, railWidth: 2,
-          jitter: jitterAmtRef.current,
+          color: lineColorRef.current, railWidth: 2, jitter: jitterAmtRef.current,
           railGap: railGapRef.current, sleeperGap: sleeperGapRef.current,
         })];
       } else if (tool === 'river') {
@@ -301,20 +339,29 @@ export default function MapEditor() {
     canvas?.renderAll();
   }, []);
 
-  // ── キャンバスサイズ変更 ────────────────────────────────────
-  const applyCanvasSize = useCallback((w: number, h: number) => {
+  // ── キャンバスサイズ変更 ───────────────────────────────────
+  const applyCanvasSize = useCallback((mmW: number, mmH: number) => {
+    const { pxW, pxH, mult } = computeCanvas(mmW, mmH);
+    canvasPxWRef.current  = pxW;
+    canvasPxHRef.current  = pxH;
+    exportMultRef.current = mult;
+    canvasMmWRef.current  = mmW;
+    canvasMmHRef.current  = mmH;
+    setCanvasMmW(mmW);
+    setCanvasMmH(mmH);
+    setPxInfo({ pxW, pxH, mult });
+
     const canvas = fabricRef.current;
     if (!canvas) return;
-    canvas.setDimensions({ width: w, height: h });
-    canvasWRef.current = w;
-    canvasHRef.current = h;
-    // 背景画像をキャンバスに合わせてリスケール
+    canvas.setDimensions({ width: pxW, height: pxH });
+
+    // 背景画像をリスケール（キャンバスにフィット）
     const img = bgImageObjRef.current;
     if (img) {
       const nw = img.width  as number;
       const nh = img.height as number;
       if (nw && nh) {
-        const scale = Math.min(w / nw, h / nh);
+        const scale = Math.min(pxW / nw, pxH / nh);
         img.set({ scaleX: scale, scaleY: scale, left: 0, top: 0 });
       }
     }
@@ -324,26 +371,26 @@ export default function MapEditor() {
 
   const handlePresetSelect = useCallback((preset: CanvasPreset) => {
     setCanvasPresetId(preset.id);
-    if (preset.id !== 'custom') {
-      setCanvasW(preset.w);
-      setCanvasH(preset.h);
-      setCustomW(String(preset.w));
-      setCustomH(String(preset.h));
-      applyCanvasSize(preset.w, preset.h);
+    if (preset.id === 'custom') {
+      // カスタム選択時は現在の mm 値を引き継ぐ
+      setCustomMmW(String(canvasMmWRef.current));
+      setCustomMmH(String(canvasMmHRef.current));
+    } else {
+      setCustomMmW(String(preset.mmW));
+      setCustomMmH(String(preset.mmH));
+      applyCanvasSize(preset.mmW, preset.mmH);
     }
   }, [applyCanvasSize]);
 
   const applyCustomSize = useCallback(() => {
-    const w = Math.max(100, Math.min(2000, parseInt(customW) || canvasWRef.current));
-    const h = Math.max(100, Math.min(2000, parseInt(customH) || canvasHRef.current));
-    setCanvasW(w);
-    setCanvasH(h);
-    setCustomW(String(w));
-    setCustomH(String(h));
-    applyCanvasSize(w, h);
-  }, [customW, customH, applyCanvasSize]);
+    const mmW = Math.max(10, Math.min(1200, parseFloat(customMmW) || canvasMmWRef.current));
+    const mmH = Math.max(10, Math.min(1200, parseFloat(customMmH) || canvasMmHRef.current));
+    setCustomMmW(String(mmW));
+    setCustomMmH(String(mmH));
+    applyCanvasSize(mmW, mmH);
+  }, [customMmW, customMmH, applyCanvasSize]);
 
-  // ── キャンバス初期化 ────────────────────────────────────────
+  // ── キャンバス初期化 ───────────────────────────────────────
   useEffect(() => {
     if (!canvasRef.current) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -357,13 +404,18 @@ export default function MapEditor() {
       fabricLibRef.current = fabric;
 
       canvas = new fabric.Canvas(canvasRef.current, {
-        width: canvasWRef.current,
-        height: canvasHRef.current,
+        width:           canvasPxWRef.current,
+        height:          canvasPxHRef.current,
         backgroundColor: bgColorRef.current,
       });
       fabricRef.current = canvas;
 
-      const initial = { json: canvas.toJSON(MAP_EXTRA_PROPS), bgColor: bgColorRef.current };
+      const initial = {
+        json:    canvas.toJSON(MAP_EXTRA_PROPS),
+        bgColor: bgColorRef.current,
+        mmW:     canvasMmWRef.current,
+        mmH:     canvasMmHRef.current,
+      };
       historyRef.current    = [JSON.stringify(initial)];
       historyIdxRef.current = 0;
 
@@ -400,25 +452,11 @@ export default function MapEditor() {
         }
       });
 
-      // mouse:move: プレビュー
       canvas.on('mouse:move', (opt: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         if (!(DRAWING_TOOLS as readonly string[]).includes(mapToolRef.current)) return;
         if (anchorPointsRef.current.length === 0) return;
         const pt = opt.pointer ?? (opt.e ? canvas.getScenePoint(opt.e) : null);
         if (pt) updatePreview({ x: pt.x, y: pt.y });
-      });
-
-      // Delete キーで選択オブジェクト削除
-      canvas.on('key:down', (opt: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        if (opt.e?.key === 'Delete' || opt.e?.key === 'Backspace') {
-          const active = canvas.getActiveObjects();
-          if (active.length > 0) {
-            active.forEach((o: any) => canvas.remove(o)); // eslint-disable-line @typescript-eslint/no-explicit-any
-            canvas.discardActiveObject();
-            canvas.renderAll();
-            saveHistory();
-          }
-        }
       });
 
       canvas.on('object:modified', saveHistory);
@@ -432,7 +470,7 @@ export default function MapEditor() {
     };
   }, [saveHistory, updatePreview]);
 
-  // ── ツール切替時のキャンバス設定 ──────────────────────────
+  // ── ツール切替 → キャンバス設定 ───────────────────────────
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -452,10 +490,10 @@ export default function MapEditor() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && mapToolRef.current === 'select') {
         const canvas = fabricRef.current;
         if (!canvas) return;
-        const active = canvas.getActiveObjects();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const active = canvas.getActiveObjects() as any[];
         if (active.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          active.forEach((o: any) => canvas.remove(o));
+          active.forEach(o => canvas.remove(o));
           canvas.discardActiveObject();
           canvas.renderAll();
           saveHistory();
@@ -479,11 +517,10 @@ export default function MapEditor() {
       if (bgImageObjRef.current) canvas.remove(bgImageObjRef.current);
 
       fabric.Image.fromURL(url).then((img: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        const cw = canvasWRef.current;
-        const ch = canvasHRef.current;
-        const nw = img.width  as number || cw;
-        const nh = img.height as number || ch;
-        // キャンバスにフィットするスケールで配置
+        const cw = canvasPxWRef.current;
+        const ch = canvasPxHRef.current;
+        const nw = (img.width  as number) || cw;
+        const nh = (img.height as number) || ch;
         const scale = Math.min(cw / nw, ch / nh);
         img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale,
                   opacity: bgOpacityRef.current, selectable: false, evented: false });
@@ -510,12 +547,13 @@ export default function MapEditor() {
     saveHistory();
   }, [saveHistory]);
 
-  // ── PNG 書き出し ──────────────────────────────────────────
+  // ── PNG 書き出し（300 DPI 相当）────────────────────────────
   const exportPng = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const url = canvas.toDataURL({ format: 'png', multiplier: 2 });
-    const a   = document.createElement('a');
+    const mult = Math.round(exportMultRef.current * 10) / 10;
+    const url  = canvas.toDataURL({ format: 'png', multiplier: mult });
+    const a    = document.createElement('a');
     a.href = url; a.download = 'map.png'; a.click();
   }, []);
 
@@ -529,7 +567,6 @@ export default function MapEditor() {
 
   // ── JSX ──────────────────────────────────────────────────
   const isLineTool = (DRAWING_TOOLS as readonly string[]).includes(mapTool);
-
   const TOOLS: { id: MapTool; icon: React.ReactNode; title: string }[] = [
     { id: 'select',  icon: <MousePointer2 size={18} />, title: '選択' },
     { id: 'road',    icon: <RoadIcon />,                title: '道路' },
@@ -545,7 +582,7 @@ export default function MapEditor() {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* ── 左ツールバー ────────────────────────────────── */}
+        {/* ── 左ツールバー ──────────────────────────────────── */}
         <div style={{ width: 52, background: 'var(--surface)', borderRight: '1px solid var(--border)',
                       padding: '8px 6px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {TOOLS.map(t => (
@@ -562,13 +599,13 @@ export default function MapEditor() {
 
         {/* ── キャンバスエリア ─────────────────────────────── */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center',
-                      justifyContent: 'center', overflow: 'auto', padding: 16 }}>
-          <div style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.18)', display: 'inline-block' }}>
+                      justifyContent: 'center', overflow: 'auto', padding: 20 }}>
+          <div style={{ boxShadow: '0 2px 18px rgba(0,0,0,0.2)', display: 'inline-block' }}>
             <canvas ref={canvasRef} />
           </div>
         </div>
 
-        {/* ── 右パネル ────────────────────────────────────── */}
+        {/* ── 右パネル ─────────────────────────────────────── */}
         <div style={{ ...S.panel, background: 'var(--surface)', borderLeft: '1px solid var(--border)' }}>
 
           {/* ════ キャンバス設定 ════ */}
@@ -580,11 +617,11 @@ export default function MapEditor() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
               {CANVAS_PRESETS.map(p => (
                 <button key={p.id} onClick={() => handlePresetSelect(p)}
-                  style={{ padding: '4px 2px', fontSize: 10, borderRadius: 5, border: 'none', cursor: 'pointer',
-                            textAlign: 'center', lineHeight: 1.35,
+                  style={{ padding: '4px 3px', fontSize: 10, borderRadius: 5, border: 'none',
+                            cursor: 'pointer', textAlign: 'center', lineHeight: 1.35,
                             background: canvasPresetId === p.id ? 'var(--accent)' : 'var(--bg)',
                             color: canvasPresetId === p.id ? '#0F2340' : 'var(--text)' }}>
-                  <span style={{ fontWeight: 700 }}>{p.label}</span><br />
+                  <span style={{ fontWeight: 700, display: 'block' }}>{p.label}</span>
                   <span style={{ fontSize: 9, opacity: 0.75 }}>{p.sub}</span>
                 </button>
               ))}
@@ -594,43 +631,47 @@ export default function MapEditor() {
           {/* カスタムサイズ入力 */}
           {canvasPresetId === 'custom' && (
             <div>
-              <div style={S.lbl}>カスタムサイズ (px)</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <input type="number" min={100} max={2000} value={customW}
-                  onChange={e => setCustomW(e.target.value)}
-                  style={{ ...S.input, width: 60, textAlign: 'center' }} placeholder="W" />
-                <span style={{ fontSize: 10, color: '#888' }}>×</span>
-                <input type="number" min={100} max={2000} value={customH}
-                  onChange={e => setCustomH(e.target.value)}
-                  style={{ ...S.input, width: 60, textAlign: 'center' }} placeholder="H" />
-                <button onClick={applyCustomSize}
-                  style={{ ...S.input, border: 'none', background: 'var(--accent)', color: '#0F2340',
-                            cursor: 'pointer', padding: '3px 8px', fontWeight: 700, fontSize: 11,
-                            borderRadius: 5, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  適用
-                </button>
+              <div style={S.lbl}>mm で指定</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 4 }}>
+                <input type="number" min={10} max={1200} step={1} value={customMmW}
+                  onChange={e => setCustomMmW(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && applyCustomSize()}
+                  style={{ ...S.input, width: 58, textAlign: 'center' }} placeholder="W" />
+                <span style={{ fontSize: 10, color: '#888', flexShrink: 0 }}>×</span>
+                <input type="number" min={10} max={1200} step={1} value={customMmH}
+                  onChange={e => setCustomMmH(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && applyCustomSize()}
+                  style={{ ...S.input, width: 58, textAlign: 'center' }} placeholder="H" />
+                <span style={{ fontSize: 10, color: '#888', flexShrink: 0 }}>mm</span>
               </div>
-              <div style={{ fontSize: 10, color: '#888', marginTop: 3 }}>
-                現在: {canvasW} × {canvasH} px
-              </div>
+              <button onClick={applyCustomSize} style={S.btn('accent')}>適用</button>
             </div>
           )}
+
+          {/* 現在のキャンバス情報 */}
+          <div style={{ fontSize: 10, color: '#888', lineHeight: 1.6, background: 'var(--bg)',
+                        borderRadius: 5, padding: '4px 7px' }}>
+            <span style={{ color: 'var(--text)', fontWeight: 600 }}>{canvasMmW} × {canvasMmH} mm</span>
+            <br />
+            表示: {pxInfo.pxW} × {pxInfo.pxH} px<br />
+            書き出し: 約 {Math.round(pxInfo.pxW * pxInfo.mult)} × {Math.round(pxInfo.pxH * pxInfo.mult)} px
+            <span style={{ color: 'var(--accent)', marginLeft: 4 }}>(300 DPI)</span>
+          </div>
 
           {/* 背景色 */}
           <div>
             <div style={S.lbl}>背景色</div>
-            {/* プリセットスウォッチ */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 5 }}>
               {BG_COLOR_PRESETS.map(p => (
                 <button key={p.color} title={p.label} onClick={() => setBgColor(p.color)}
                   style={{ width: 22, height: 22, borderRadius: 4, cursor: 'pointer', padding: 0,
                             background: p.color, flexShrink: 0,
-                            border: bgColor === p.color ? '2px solid var(--accent)' : '1px solid var(--border)',
-                            outline: bgColor === p.color ? '1px solid var(--accent)' : 'none',
+                            border: bgColor === p.color
+                              ? '2px solid var(--accent)' : '1px solid var(--border)',
+                            outline:      bgColor === p.color ? '1px solid var(--accent)' : 'none',
                             outlineOffset: 1 }} />
               ))}
             </div>
-            {/* カラーピッカー（カスタム色） */}
             <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)}
               style={{ width: '100%', height: 26, borderRadius: 5, border: '1px solid var(--border)',
                         cursor: 'pointer' }} />
@@ -744,7 +785,7 @@ export default function MapEditor() {
               <div style={S.sectionHead}>スタンプ配置</div>
               {stamps.length === 0 ? (
                 <div style={{ fontSize: 11, color: '#888', lineHeight: 1.5 }}>
-                  スタンプエディターで<br />スタンプを登録してください
+                  スタンプエディターでスタンプを登録してください
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -775,7 +816,6 @@ export default function MapEditor() {
             </>
           )}
 
-          {/* 選択モード案内 */}
           {mapTool === 'select' && (
             <div style={{ fontSize: 11, color: '#888', lineHeight: 1.7 }}>
               オブジェクトを選択して<br />移動・削除できます。<br />
@@ -809,7 +849,7 @@ export default function MapEditor() {
           {/* ════ 書き出し ════ */}
           <div style={S.divider} />
           <button onClick={exportPng} style={S.btn()}>
-            <Download size={11} /> PNG 書き出し（2×）
+            <Download size={11} /> PNG 書き出し（300 DPI）
           </button>
         </div>
       </div>

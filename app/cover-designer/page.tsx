@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/AppHeader';
 import { getSavedMaps, deleteMap } from '@/lib/mapStorage';
 import type { SavedMap } from '@/lib/mapStorage';
@@ -156,7 +155,6 @@ function NumberStepper({ label, value, onChange, min, max, step = 1 }: {
 }
 
 export default function CoverDesignerPage() {
-  const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fabricRef = useRef<any>(null);
@@ -2297,23 +2295,10 @@ export default function CoverDesignerPage() {
                 title="更新">↻</button>
             </div>
 
-            {/* キャンバスエディタを開く */}
-            <button
-              onClick={() => router.push('/canvas-editor')}
-              style={{ ...S.btn(), width: '100%', marginBottom: 6, fontSize: 11 }}>
-              キャンバスエディタを開く →
-            </button>
-
             {/* Active map info */}
             {activeMapId && (
               <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6, textAlign: 'center' }}>
                 ✓ {savedMaps.find(m => m.id === activeMapId)?.name ?? 'マップ背景'}
-                {' '}
-                <button
-                  onClick={() => router.push(`/canvas-editor?edit=${activeMapId}`)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 10, textDecoration: 'underline' }}>
-                  編集
-                </button>
               </div>
             )}
 
@@ -2344,11 +2329,6 @@ export default function CoverDesignerPage() {
                         disabled={isRenderingMap}
                         style={{ ...S.btn(activeMapId === map.id), flex: 1, fontSize: 10, padding: '3px 0' }}>
                         {isRenderingMap && activeMapId !== map.id ? '...' : '適用'}
-                      </button>
-                      <button
-                        onClick={() => router.push(`/canvas-editor?edit=${map.id}`)}
-                        style={{ ...S.btn(), flex: 1, fontSize: 10, padding: '3px 0' }}>
-                        編集
                       </button>
                       <button
                         onClick={() => { deleteMap(map.id); setSavedMaps(getSavedMaps()); if (activeMapId === map.id) setActiveMapId(''); }}

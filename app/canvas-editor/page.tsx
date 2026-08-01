@@ -14,6 +14,8 @@ import {
   buildRailwayObjects,
   buildRiverObjects,
   buildGreenAreaObjects,
+  buildBridgeObjects,
+  buildPlazaObjects,
   type Point,
 } from '@/lib/handDrawnPath';
 
@@ -79,13 +81,13 @@ const BG_COLOR_PRESETS = [
 const DEFAULT_BG = '#FFFEF0';
 
 // ── ツール定義 ────────────────────────────────────────────────
-const DRAWING_TOOLS = ['road', 'railway', 'river', 'greenarea'] as const;
+const DRAWING_TOOLS = ['road', 'railway', 'river', 'greenarea', 'bridge', 'plaza'] as const;
 const MAP_EXTRA_PROPS = ['_mapLineType', '_isBgImage', '_mapStampId', '_anchorPoints', '_strokeId', '_mapOpts'];
 
-type MapTool = 'select' | 'road' | 'railway' | 'river' | 'greenarea' | 'stamp';
+type MapTool = 'select' | 'road' | 'railway' | 'river' | 'greenarea' | 'bridge' | 'plaza' | 'stamp';
 
-// 緑地のみ確定に 3 点以上必要（閉じた多角形）
-const MIN_ANCHOR: Record<string, number> = { greenarea: 3 };
+// 緑地のみ確定に 3 点以上必要（閉じた多角形）; bridge/plaza は 2 点
+const MIN_ANCHOR: Record<string, number> = { greenarea: 3, plaza: 2, bridge: 2 };
 function minAnchor(tool: MapTool) { return MIN_ANCHOR[tool] ?? 2; }
 
 // ── スタイル定数 ─────────────────────────────────────────────
@@ -125,6 +127,8 @@ const RailwayIcon   = () => <svg viewBox="0 0 20 20" width={18} height={18} fill
 const RiverIcon     = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M2 7 Q5 5 8 7 Q11 9 14 7 Q17 5 18 7"/><path d="M2 13 Q5 11 8 13 Q11 15 14 13 Q17 11 18 13"/></svg>;
 const GreenAreaIcon = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="rgba(125,195,107,0.35)" stroke="currentColor" strokeWidth={1.5}><path d="M10 3 Q14 5 16 9 Q17 14 13 16 Q8 18 5 15 Q2 11 4 7 Q7 3 10 3 Z"/></svg>;
 const StampIcon     = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6}><circle cx="10" cy="8" r="4.5"/><rect x="6" y="14" width="8" height="2.5" rx="1"/><line x1="10" y1="12.5" x2="10" y2="14"/></svg>;
+const BridgeIcon    = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6}><line x1="10" y1="4" x2="10" y2="16"/><line x1="4" y1="7" x2="16" y2="7"/><line x1="4" y1="10" x2="16" y2="10"/><line x1="4" y1="13" x2="16" y2="13"/></svg>;
+const PlazaIcon     = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6} strokeDasharray="3 2"><rect x="3" y="4" width="14" height="12" rx="1"/></svg>;
 
 // ── 初期計算 ─────────────────────────────────────────────────
 const INIT = computeCanvas(DEFAULT_PRESET.mmW, DEFAULT_PRESET.mmH);
@@ -152,25 +156,23 @@ export default function MapEditor() {
   const previewObjsRef = useRef<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   // ── 線・共通プロパティ ─────────────────────────────────────
-  const [lineColor,   setLineColor]   = useState('#C8B89A');
-  const [strokeWidth, setStrokeWidth] = useState(8);
+  const [lineColor,   setLineColor]   = useState('#999999');
+  const [strokeWidth, setStrokeWidth] = useState(2);
   const [jitterAmt,   setJitterAmt]   = useState(3);
   const [roadDouble,  setRoadDouble]  = useState(false);
   const [railGap,     setRailGap]     = useState(10);
   const [sleeperGap,  setSleeperGap]  = useState(14);
-  const [riverWidth,  setRiverWidth]  = useState(20);
-  const [riverFill,   setRiverFill]   = useState('#B0D4E8');
-  const [riverStroke, setRiverStroke] = useState('#7BAEC8');
+  const [riverColor,  setRiverColor]  = useState('#7D97A3');
+  const [riverWidth,  setRiverWidth]  = useState(2);
 
-  const lineColorRef   = useRef('#C8B89A');
-  const strokeWidthRef = useRef(8);
+  const lineColorRef   = useRef('#999999');
+  const strokeWidthRef = useRef(2);
   const jitterAmtRef   = useRef(3);
   const roadDoubleRef  = useRef(false);
   const railGapRef     = useRef(10);
   const sleeperGapRef  = useRef(14);
-  const riverWidthRef  = useRef(20);
-  const riverFillRef   = useRef('#B0D4E8');
-  const riverStrokeRef = useRef('#7BAEC8');
+  const riverColorRef  = useRef('#7D97A3');
+  const riverWidthRef  = useRef(2);
 
   useEffect(() => { lineColorRef.current   = lineColor;   }, [lineColor]);
   useEffect(() => { strokeWidthRef.current = strokeWidth; }, [strokeWidth]);
@@ -178,20 +180,63 @@ export default function MapEditor() {
   useEffect(() => { roadDoubleRef.current  = roadDouble;  }, [roadDouble]);
   useEffect(() => { railGapRef.current     = railGap;     }, [railGap]);
   useEffect(() => { sleeperGapRef.current  = sleeperGap;  }, [sleeperGap]);
+  useEffect(() => { riverColorRef.current  = riverColor;  }, [riverColor]);
   useEffect(() => { riverWidthRef.current  = riverWidth;  }, [riverWidth]);
-  useEffect(() => { riverFillRef.current   = riverFill;   }, [riverFill]);
-  useEffect(() => { riverStrokeRef.current = riverStroke; }, [riverStroke]);
+
+  // ── 橋プロパティ ───────────────────────────────────────────
+  const [bridgeColor,    setBridgeColor]    = useState('#888888');
+  const [bridgeHatchLen, setBridgeHatchLen] = useState(12);
+  const [bridgeHatchGap, setBridgeHatchGap] = useState(8);
+  const [bridgeStrokeW,  setBridgeStrokeW]  = useState(1.5);
+
+  const bridgeColorRef    = useRef('#888888');
+  const bridgeHatchLenRef = useRef(12);
+  const bridgeHatchGapRef = useRef(8);
+  const bridgeStrokeWRef  = useRef(1.5);
+
+  useEffect(() => { bridgeColorRef.current    = bridgeColor;    }, [bridgeColor]);
+  useEffect(() => { bridgeHatchLenRef.current = bridgeHatchLen; }, [bridgeHatchLen]);
+  useEffect(() => { bridgeHatchGapRef.current = bridgeHatchGap; }, [bridgeHatchGap]);
+  useEffect(() => { bridgeStrokeWRef.current  = bridgeStrokeW;  }, [bridgeStrokeW]);
+
+  // ── 広場プロパティ ─────────────────────────────────────────
+  const [plazaColor,   setPlazaColor]   = useState('#999999');
+  const [plazaStrokeW, setPlazaStrokeW] = useState(1.5);
+  const [plazaDashLen, setPlazaDashLen] = useState(6);
+  const [plazaDashGap, setPlazaDashGap] = useState(4);
+
+  const plazaColorRef   = useRef('#999999');
+  const plazaStrokeWRef = useRef(1.5);
+  const plazaDashLenRef = useRef(6);
+  const plazaDashGapRef = useRef(4);
+
+  useEffect(() => { plazaColorRef.current   = plazaColor;   }, [plazaColor]);
+  useEffect(() => { plazaStrokeWRef.current = plazaStrokeW; }, [plazaStrokeW]);
+  useEffect(() => { plazaDashLenRef.current = plazaDashLen; }, [plazaDashLen]);
+  useEffect(() => { plazaDashGapRef.current = plazaDashGap; }, [plazaDashGap]);
+
+  // ── グリッドスナップ ───────────────────────────────────────
+  const [gridSnap, setGridSnap] = useState(false);
+  const [gridSize, setGridSize] = useState(10);
+  const gridSnapRef = useRef(false);
+  const gridSizeRef = useRef(10);
+  useEffect(() => { gridSnapRef.current = gridSnap; }, [gridSnap]);
+  useEffect(() => { gridSizeRef.current = gridSize; }, [gridSize]);
+
+  // ── finalizePath への参照 ─────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const finalizePathRef = useRef<() => void>(() => {});
 
   // ── 緑地プロパティ ─────────────────────────────────────────
-  const [greenFill,        setGreenFill]        = useState('#7DC36B');
-  const [greenFillOpacity, setGreenFillOpacity] = useState(0.25);
-  const [greenStroke,      setGreenStroke]      = useState('#4A8A3C');
-  const [greenStrokeW,     setGreenStrokeW]     = useState(2);
+  const [greenFill,        setGreenFill]        = useState('#A9B787');
+  const [greenFillOpacity, setGreenFillOpacity] = useState(0.3);
+  const [greenStroke,      setGreenStroke]      = useState('#8A9870');
+  const [greenStrokeW,     setGreenStrokeW]     = useState(1.5);
 
-  const greenFillRef        = useRef('#7DC36B');
-  const greenFillOpacityRef = useRef(0.25);
-  const greenStrokeRef      = useRef('#4A8A3C');
-  const greenStrokeWRef     = useRef(2);
+  const greenFillRef        = useRef('#A9B787');
+  const greenFillOpacityRef = useRef(0.3);
+  const greenStrokeRef      = useRef('#8A9870');
+  const greenStrokeWRef     = useRef(1.5);
 
   useEffect(() => { greenFillRef.current        = greenFill;        }, [greenFill]);
   useEffect(() => { greenFillOpacityRef.current = greenFillOpacity; }, [greenFillOpacity]);
@@ -365,6 +410,36 @@ export default function MapEditor() {
     const pts = anchorPointsRef.current;
     if (pts.length === 0) { canvas.renderAll(); return; }
 
+    // Plaza special preview: rectangle
+    if (mapToolRef.current === 'plaza' && pts.length === 1 && mousePt) {
+      const pt1 = pts[0];
+      const left = Math.min(pt1.x, mousePt.x);
+      const top = Math.min(pt1.y, mousePt.y);
+      const w = Math.abs(mousePt.x - pt1.x);
+      const h = Math.abs(mousePt.y - pt1.y);
+      if (w > 1 && h > 1) {
+        const rectPreview = new fabric.Rect({
+          left, top, width: w, height: h,
+          fill: 'rgba(150,150,150,0.08)',
+          stroke: '#4A90E2', strokeWidth: 1.5,
+          strokeDashArray: [6, 3],
+          selectable: false, evented: false,
+        });
+        previewObjsRef.current.push(rectPreview);
+        canvas.add(rectPreview);
+      }
+      // anchor dot for first point
+      const dot = new fabric.Circle({
+        left: pt1.x, top: pt1.y, originX: 'center', originY: 'center',
+        radius: 4.5, fill: '#4A90E2', stroke: '#fff', strokeWidth: 1.5,
+        selectable: false, evented: false,
+      });
+      previewObjsRef.current.push(dot);
+      canvas.add(dot);
+      canvas.renderAll();
+      return; // don't run normal preview
+    }
+
     const isGreenArea = mapToolRef.current === 'greenarea';
 
     // アンカー点ドット
@@ -445,8 +520,9 @@ export default function MapEditor() {
         })];
       } else if (tool === 'river') {
         objs = [buildRiverObjects(fabric, pts, {
-          fillColor: riverFillRef.current, strokeColor: riverStrokeRef.current,
-          width: riverWidthRef.current, jitter: jitterAmtRef.current,
+          color: riverColorRef.current,
+          strokeWidth: riverWidthRef.current,
+          jitter: jitterAmtRef.current,
         })];
       } else if (tool === 'greenarea') {
         const g = buildGreenAreaObjects(fabric, pts, {
@@ -456,6 +532,22 @@ export default function MapEditor() {
           jitter:      jitterAmtRef.current,
         });
         if (g) objs = [g];
+      } else if (tool === 'bridge') {
+        const obj = buildBridgeObjects(fabric, pts, {
+          color: bridgeColorRef.current,
+          hatchLength: bridgeHatchLenRef.current,
+          hatchGap: bridgeHatchGapRef.current,
+          strokeWidth: bridgeStrokeWRef.current,
+        });
+        if (obj) objs = [obj];
+      } else if (tool === 'plaza') {
+        const obj = buildPlazaObjects(fabric, pts[0], pts[1], {
+          color: plazaColorRef.current,
+          strokeWidth: plazaStrokeWRef.current,
+          dashLen: plazaDashLenRef.current,
+          dashGap: plazaDashGapRef.current,
+        });
+        if (obj) objs = [obj];
       }
       // アンカー点・オプションをオブジェクトに付与（後からプロパティ編集に使用）
       const strokeId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -463,8 +555,10 @@ export default function MapEditor() {
       let mapOpts: any = {};
       if (tool === 'road') mapOpts = { color: lineColorRef.current, strokeWidth: strokeWidthRef.current, doubleStroke: roadDoubleRef.current };
       else if (tool === 'railway') mapOpts = { color: lineColorRef.current, railGap: railGapRef.current, sleeperGap: sleeperGapRef.current };
-      else if (tool === 'river') mapOpts = { fillColor: riverFillRef.current, strokeColor: riverStrokeRef.current, width: riverWidthRef.current };
+      else if (tool === 'river') mapOpts = { color: riverColorRef.current, strokeWidth: riverWidthRef.current };
       else if (tool === 'greenarea') mapOpts = { fillColor: greenFillRef.current, fillOpacity: greenFillOpacityRef.current, strokeColor: greenStrokeRef.current, strokeWidth: greenStrokeWRef.current };
+      else if (tool === 'bridge') mapOpts = { color: bridgeColorRef.current, hatchLength: bridgeHatchLenRef.current, hatchGap: bridgeHatchGapRef.current, strokeWidth: bridgeStrokeWRef.current };
+      else if (tool === 'plaza') mapOpts = { color: plazaColorRef.current, strokeWidth: plazaStrokeWRef.current, dashLen: plazaDashLenRef.current, dashGap: plazaDashGapRef.current };
       objs.forEach(o => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (o as any)._anchorPoints = [...pts];
@@ -480,6 +574,8 @@ export default function MapEditor() {
     anchorPointsRef.current = [];
     setAnchorCount(0);
   }, [saveHistory]);
+
+  useEffect(() => { finalizePathRef.current = finalizePath; }, [finalizePath]);
 
   const cancelDrawing = useCallback(() => {
     const canvas = fabricRef.current;
@@ -515,23 +611,22 @@ export default function MapEditor() {
       const children: any[] = first.getObjects?.() || [];
       setSelStroke(children[0]?.stroke || '#555555');
     } else if (lt === 'river') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const children: any[] = first.getObjects?.() || [];
-      const body = children[0]; // 水面（太いストローク）
-      const bank = children[1]; // 岸線
-      if (body) {
-        const parsed = parseRgba(typeof body.fill === 'string' ? body.fill : '');
-        setSelFill(parsed.color); selFillRef.current = parsed.color;
-        setSelFillOp(parsed.alpha); selFillOpRef.current = parsed.alpha;
-        setSelStrokeW(body.strokeWidth || 20);
-      }
-      if (bank) setSelStroke(bank.stroke || '#7BAEC8');
+      setSelStroke(first.stroke || '#7D97A3');
+      setSelStrokeW(first.strokeWidth || 2);
     } else if (lt === 'greenarea') {
       const parsed = parseRgba(typeof first.fill === 'string' ? first.fill : '');
       setSelFill(parsed.color); selFillRef.current = parsed.color;
       setSelFillOp(parsed.alpha); selFillOpRef.current = parsed.alpha;
-      setSelStroke(first.stroke || '#4A8A3C');
-      setSelStrokeW(first.strokeWidth || 2);
+      setSelStroke(first.stroke || '#8A9870');
+      setSelStrokeW(first.strokeWidth || 1.5);
+    } else if (lt === 'bridge') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const children: any[] = first.getObjects?.() || [];
+      setSelStroke(children[0]?.stroke || '#888888');
+      setSelStrokeW(children[0]?.strokeWidth || 1.5);
+    } else if (lt === 'plaza') {
+      setSelStroke(first.stroke || '#999999');
+      setSelStrokeW(first.strokeWidth || 1.5);
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const jitter = (first as any)._mapOpts ? (() => { try { return JSON.parse((first as any)._mapOpts)?.jitter ?? jitterAmtRef.current; } catch { return jitterAmtRef.current; } })() : jitterAmtRef.current;
@@ -551,9 +646,13 @@ export default function MapEditor() {
       } else if (lt === 'railway') {
         (obj.getObjects?.() || []).forEach((c: any) => c.set({ stroke: color }));
       } else if (lt === 'river') {
-        const ch: any[] = obj.getObjects?.() || [];
-        [ch[1], ch[2]].filter(Boolean).forEach((c: any) => c.set({ stroke: color }));
+        obj.set({ stroke: color });
       } else if (lt === 'greenarea') {
+        obj.set({ stroke: color });
+      } else if (lt === 'bridge') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (obj.getObjects?.() || []).forEach((c: any) => c.set({ stroke: color }));
+      } else if (lt === 'plaza') {
         obj.set({ stroke: color });
       }
       try { const o = JSON.parse(obj._mapOpts || '{}'); obj._mapOpts = JSON.stringify({ ...o, color, strokeColor: color }); } catch { /* */ }
@@ -576,8 +675,12 @@ export default function MapEditor() {
       } else if (lt === 'greenarea') {
         obj.set({ strokeWidth: w });
       } else if (lt === 'river') {
-        const ch: any[] = obj.getObjects?.() || [];
-        if (ch[0]) ch[0].set({ strokeWidth: w }); // body width
+        obj.set({ strokeWidth: w });
+      } else if (lt === 'bridge') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (obj.getObjects?.() || []).forEach((c: any) => c.set({ strokeWidth: w }));
+      } else if (lt === 'plaza') {
+        obj.set({ strokeWidth: w });
       }
       try { const o = JSON.parse(obj._mapOpts || '{}'); obj._mapOpts = JSON.stringify({ ...o, strokeWidth: w, width: w }); } catch { /* */ }
     });
@@ -594,10 +697,7 @@ export default function MapEditor() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (canvas.getActiveObjects() as any[]).filter((o: any) => o._mapLineType).forEach((obj: any) => {
       const lt: string = obj._mapLineType;
-      if (lt === 'river') {
-        const ch: any[] = obj.getObjects?.() || [];
-        if (ch[0]) ch[0].set({ fill: rgba });
-      } else if (lt === 'greenarea') {
+      if (lt === 'greenarea') {
         obj.set({ fill: rgba });
       }
       try { const o = JSON.parse(obj._mapOpts || '{}'); obj._mapOpts = JSON.stringify({ ...o, fillColor: color, fillOpacity: opacity }); } catch { /* */ }
@@ -638,7 +738,7 @@ export default function MapEditor() {
       } else if (lt === 'railway') {
         newObj = buildRailwayObjects(fabric, pts, { color: opts.color || lineColorRef.current, railWidth: 2, jitter, railGap: opts.railGap || railGapRef.current, sleeperGap: opts.sleeperGap || sleeperGapRef.current });
       } else if (lt === 'river') {
-        newObj = buildRiverObjects(fabric, pts, { fillColor: opts.fillColor || riverFillRef.current, strokeColor: opts.strokeColor || riverStrokeRef.current, width: opts.width || riverWidthRef.current, jitter });
+        newObj = buildRiverObjects(fabric, pts, { color: opts.color || riverColorRef.current, strokeWidth: opts.strokeWidth || riverWidthRef.current, jitter });
       } else if (lt === 'greenarea') {
         newObj = buildGreenAreaObjects(fabric, pts, { fillColor: hexToRgba(opts.fillColor || greenFillRef.current, opts.fillOpacity ?? greenFillOpacityRef.current), strokeColor: opts.strokeColor || greenStrokeRef.current, strokeWidth: opts.strokeWidth || greenStrokeWRef.current, jitter });
       }
@@ -749,8 +849,30 @@ export default function MapEditor() {
         const pt   = opt.pointer ?? (opt.e ? canvas.getScenePoint(opt.e) : null);
         if (!pt) return;
 
+        // Plaza: auto-finalize on 2nd click
+        if (tool === 'plaza') {
+          let snappedPt = { x: pt.x, y: pt.y };
+          if (gridSnapRef.current) {
+            const g = gridSizeRef.current;
+            snappedPt = { x: Math.round(pt.x / g) * g, y: Math.round(pt.y / g) * g };
+          }
+          anchorPointsRef.current.push(snappedPt);
+          setAnchorCount(anchorPointsRef.current.length);
+          if (anchorPointsRef.current.length >= 2) {
+            finalizePathRef.current();
+          } else {
+            updatePreview(undefined);
+          }
+          return;
+        }
+
         if ((DRAWING_TOOLS as readonly string[]).includes(tool)) {
-          anchorPointsRef.current.push({ x: pt.x, y: pt.y });
+          let snappedPt = { x: pt.x, y: pt.y };
+          if (gridSnapRef.current) {
+            const g = gridSizeRef.current;
+            snappedPt = { x: Math.round(pt.x / g) * g, y: Math.round(pt.y / g) * g };
+          }
+          anchorPointsRef.current.push(snappedPt);
           setAnchorCount(anchorPointsRef.current.length);
           updatePreview(undefined);
 
@@ -1036,8 +1158,9 @@ export default function MapEditor() {
   const selectTool = useCallback((t: MapTool) => {
     if (anchorPointsRef.current.length > 0) cancelDrawing();
     setMapTool(t);
-    if (t === 'road')    setLineColor('#C8B89A');
-    if (t === 'railway') setLineColor('#555555');
+    if (t === 'road')    { setLineColor('#999999'); setStrokeWidth(2); }
+    if (t === 'railway') { setLineColor('#4A3E2E'); }
+    if (t === 'river')   { setRiverColor('#7D97A3'); setRiverWidth(2); }
   }, [cancelDrawing]);
 
   // ── JSX ──────────────────────────────────────────────────
@@ -1045,7 +1168,7 @@ export default function MapEditor() {
 
   const toolLabel: Record<MapTool, string> = {
     select: '選択', road: '道路', railway: '線路',
-    river: '川', greenarea: '緑地', stamp: 'スタンプ',
+    river: '川', greenarea: '緑地', bridge: '橋', plaza: '広場', stamp: 'スタンプ',
   };
 
   const TOOLS: { id: MapTool; icon: React.ReactNode; title: string }[] = [
@@ -1054,6 +1177,8 @@ export default function MapEditor() {
     { id: 'railway',   icon: <RailwayIcon />,             title: '線路' },
     { id: 'river',     icon: <RiverIcon />,               title: '川' },
     { id: 'greenarea', icon: <GreenAreaIcon />,           title: '緑地（公園・森）' },
+    { id: 'bridge',    icon: <BridgeIcon />,              title: '橋' },
+    { id: 'plaza',     icon: <PlazaIcon />,               title: '広場・オープンスペース' },
     { id: 'stamp',     icon: <StampIcon />,               title: 'スタンプ' },
   ];
 
@@ -1159,6 +1284,24 @@ export default function MapEditor() {
                         cursor: 'pointer' }} />
           </div>
 
+          {/* グリッドスナップ */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer' }}>
+              <input type="checkbox" checked={gridSnap} onChange={e => setGridSnap(e.target.checked)}
+                style={{ accentColor: 'var(--accent)' }} />
+              グリッドスナップ
+            </label>
+            {gridSnap && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                <span style={{ fontSize: 10, color: '#888' }}>間隔</span>
+                <input type="number" min={2} max={50} step={1} value={gridSize}
+                  onChange={e => setGridSize(Number(e.target.value) || 10)}
+                  style={{ ...S.input, width: 48, textAlign: 'center' }} />
+                <span style={{ fontSize: 10, color: '#888' }}>px</span>
+              </div>
+            )}
+          </div>
+
           <div style={S.divider} />
 
           {/* ════ 線ツール プロパティ ════ */}
@@ -1218,21 +1361,16 @@ export default function MapEditor() {
               {mapTool === 'river' && (
                 <>
                   <div>
+                    <div style={S.lbl}>色</div>
+                    <input type="color" value={riverColor} onChange={e => setRiverColor(e.target.value)}
+                      style={{ width: '100%', height: 28, borderRadius: 5 }} />
+                  </div>
+                  <div>
                     <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
-                      <span>川幅</span><span style={{ color: 'var(--accent)' }}>{riverWidth}px</span>
+                      <span>太さ</span><span style={{ color: 'var(--accent)' }}>{riverWidth}px</span>
                     </div>
-                    <input type="range" min={6} max={60} step={2} value={riverWidth}
+                    <input type="range" min={1} max={8} step={0.5} value={riverWidth}
                       onChange={e => setRiverWidth(Number(e.target.value))} style={{ width: '100%' }} />
-                  </div>
-                  <div>
-                    <div style={S.lbl}>水面色</div>
-                    <input type="color" value={riverFill} onChange={e => setRiverFill(e.target.value)}
-                      style={{ width: '100%', height: 28, borderRadius: 5 }} />
-                  </div>
-                  <div>
-                    <div style={S.lbl}>輪郭色</div>
-                    <input type="color" value={riverStroke} onChange={e => setRiverStroke(e.target.value)}
-                      style={{ width: '100%', height: 28, borderRadius: 5 }} />
                   </div>
                 </>
               )}
@@ -1269,14 +1407,80 @@ export default function MapEditor() {
                 </>
               )}
 
-              {/* 手ブレ量（共通） */}
-              <div>
-                <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
-                  <span>手ブレ量</span><span style={{ color: 'var(--accent)' }}>{jitterAmt}px</span>
+              {/* 橋 */}
+              {mapTool === 'bridge' && (
+                <>
+                  <div>
+                    <div style={S.lbl}>色</div>
+                    <input type="color" value={bridgeColor} onChange={e => setBridgeColor(e.target.value)}
+                      style={{ width: '100%', height: 28, borderRadius: 5 }} />
+                  </div>
+                  <div>
+                    <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>ハッチ長さ</span><span style={{ color: 'var(--accent)' }}>{bridgeHatchLen}px</span>
+                    </div>
+                    <input type="range" min={4} max={24} step={1} value={bridgeHatchLen}
+                      onChange={e => setBridgeHatchLen(Number(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>ハッチ間隔</span><span style={{ color: 'var(--accent)' }}>{bridgeHatchGap}px</span>
+                    </div>
+                    <input type="range" min={4} max={24} step={1} value={bridgeHatchGap}
+                      onChange={e => setBridgeHatchGap(Number(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>線の太さ</span><span style={{ color: 'var(--accent)' }}>{bridgeStrokeW}px</span>
+                    </div>
+                    <input type="range" min={0.5} max={4} step={0.5} value={bridgeStrokeW}
+                      onChange={e => setBridgeStrokeW(Number(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                </>
+              )}
+
+              {/* 広場 */}
+              {mapTool === 'plaza' && (
+                <>
+                  <div>
+                    <div style={S.lbl}>色</div>
+                    <input type="color" value={plazaColor} onChange={e => setPlazaColor(e.target.value)}
+                      style={{ width: '100%', height: 28, borderRadius: 5 }} />
+                  </div>
+                  <div>
+                    <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>線の太さ</span><span style={{ color: 'var(--accent)' }}>{plazaStrokeW}px</span>
+                    </div>
+                    <input type="range" min={0.5} max={4} step={0.5} value={plazaStrokeW}
+                      onChange={e => setPlazaStrokeW(Number(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>破線 長さ</span><span style={{ color: 'var(--accent)' }}>{plazaDashLen}</span>
+                    </div>
+                    <input type="range" min={2} max={16} step={1} value={plazaDashLen}
+                      onChange={e => setPlazaDashLen(Number(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>破線 間隔</span><span style={{ color: 'var(--accent)' }}>{plazaDashGap}</span>
+                    </div>
+                    <input type="range" min={2} max={16} step={1} value={plazaDashGap}
+                      onChange={e => setPlazaDashGap(Number(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                </>
+              )}
+
+              {/* 手ブレ量（bridge・plaza 以外） */}
+              {!['bridge', 'plaza'].includes(mapTool) && (
+                <div>
+                  <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>手ブレ量</span><span style={{ color: 'var(--accent)' }}>{jitterAmt}px</span>
+                  </div>
+                  <input type="range" min={0} max={10} step={0.5} value={jitterAmt}
+                    onChange={e => setJitterAmt(Number(e.target.value))} style={{ width: '100%' }} />
                 </div>
-                <input type="range" min={0} max={10} step={0.5} value={jitterAmt}
-                  onChange={e => setJitterAmt(Number(e.target.value))} style={{ width: '100%' }} />
-              </div>
+              )}
 
               <div style={S.divider} />
 
@@ -1285,7 +1489,11 @@ export default function MapEditor() {
                 {anchorCount === 0
                   ? mapTool === 'greenarea'
                     ? 'クリックで頂点を追加（3点以上）'
+                    : mapTool === 'plaza'
+                    ? '1点目: 角を指定'
                     : 'クリックで点を追加'
+                  : mapTool === 'plaza' && anchorCount === 1
+                  ? '2点目: 対角を指定'
                   : `アンカー点 ${anchorCount} 個`}
                 {canFinalize && (
                   <div style={{ fontSize: 10, marginTop: 2 }}>
@@ -1293,7 +1501,7 @@ export default function MapEditor() {
                   </div>
                 )}
               </div>
-              {canFinalize && (
+              {canFinalize && mapTool !== 'plaza' && (
                 <button onClick={finalizePath} style={S.btn('accent')}>確定 (Enter)</button>
               )}
               {anchorCount > 0 && (
@@ -1353,7 +1561,7 @@ export default function MapEditor() {
           {mapTool === 'select' && hasMapSel && (
             <>
               <div style={S.sectionHead}>
-                {({ road: '道路', railway: '線路', river: '川', greenarea: '緑地' } as Record<string,string>)[selType] ?? selType}
+                {({ road: '道路', railway: '線路', river: '川', greenarea: '緑地', bridge: '橋', plaza: '広場' } as Record<string,string>)[selType] ?? selType}
                 {selCount > 1 && <span style={{ fontWeight: 400, color: '#888' }}> × {selCount}</span>}
               </div>
 
@@ -1365,8 +1573,8 @@ export default function MapEditor() {
                   style={{ width: '100%', height: 28, borderRadius: 5 }} />
               </div>
 
-              {/* 線の太さ (road / greenarea / river-width) */}
-              {(selType === 'road' || selType === 'greenarea') && (
+              {/* 線の太さ (road / greenarea / bridge / plaza) */}
+              {(selType === 'road' || selType === 'greenarea' || selType === 'plaza' || selType === 'bridge') && (
                 <div>
                   <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
                     <span>線の太さ</span><span style={{ color: 'var(--accent)' }}>{selStrokeW}px</span>
@@ -1379,16 +1587,16 @@ export default function MapEditor() {
               {selType === 'river' && (
                 <div>
                   <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>川幅</span><span style={{ color: 'var(--accent)' }}>{selStrokeW}px</span>
+                    <span>線の太さ</span><span style={{ color: 'var(--accent)' }}>{selStrokeW}px</span>
                   </div>
-                  <input type="range" min={6} max={60} step={2} value={selStrokeW}
+                  <input type="range" min={1} max={8} step={0.5} value={selStrokeW}
                     onChange={e => { setSelStrokeW(Number(e.target.value)); applySelStrokeW(Number(e.target.value)); }}
                     style={{ width: '100%' }} />
                 </div>
               )}
 
-              {/* 塗り (river / greenarea) */}
-              {(selType === 'river' || selType === 'greenarea') && (
+              {/* 塗り (greenarea のみ) */}
+              {selType === 'greenarea' && (
                 <>
                   <div>
                     <div style={S.lbl}>塗りの色</div>
@@ -1408,18 +1616,20 @@ export default function MapEditor() {
                 </>
               )}
 
-              {/* ジッター（再構築が必要なため mouseUp で適用） */}
-              <div>
-                <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
-                  <span>手ブレ量</span><span style={{ color: 'var(--accent)' }}>{selJitter}px</span>
+              {/* ジッター（再構築が必要なため mouseUp で適用; bridge・plaza はスキップ） */}
+              {!['bridge', 'plaza'].includes(selType) && (
+                <div>
+                  <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>手ブレ量</span><span style={{ color: 'var(--accent)' }}>{selJitter}px</span>
+                  </div>
+                  <input type="range" min={0} max={10} step={0.5} value={selJitter}
+                    onChange={e => setSelJitter(Number(e.target.value))}
+                    onMouseUp={e => applySelJitter(Number((e.target as HTMLInputElement).value))}
+                    onTouchEnd={e => applySelJitter(Number((e.target as HTMLInputElement).value))}
+                    style={{ width: '100%' }} />
+                  <div style={{ fontSize: 9, color: '#888', textAlign: 'right' }}>マウスを離すと適用</div>
                 </div>
-                <input type="range" min={0} max={10} step={0.5} value={selJitter}
-                  onChange={e => setSelJitter(Number(e.target.value))}
-                  onMouseUp={e => applySelJitter(Number((e.target as HTMLInputElement).value))}
-                  onTouchEnd={e => applySelJitter(Number((e.target as HTMLInputElement).value))}
-                  style={{ width: '100%' }} />
-                <div style={{ fontSize: 9, color: '#888', textAlign: 'right' }}>マウスを離すと適用</div>
-              </div>
+              )}
               <div style={S.divider} />
             </>
           )}

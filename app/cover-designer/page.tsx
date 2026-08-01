@@ -2297,11 +2297,11 @@ export default function CoverDesignerPage() {
                 title="更新">↻</button>
             </div>
 
-            {/* マップエディタを開く */}
+            {/* キャンバスエディタを開く */}
             <button
-              onClick={() => router.push('/map-editor')}
+              onClick={() => router.push('/canvas-editor')}
               style={{ ...S.btn(), width: '100%', marginBottom: 6, fontSize: 11 }}>
-              マップエディタを開く →
+              キャンバスエディタを開く →
             </button>
 
             {/* Active map info */}
@@ -2310,7 +2310,7 @@ export default function CoverDesignerPage() {
                 ✓ {savedMaps.find(m => m.id === activeMapId)?.name ?? 'マップ背景'}
                 {' '}
                 <button
-                  onClick={() => router.push(`/map-editor?edit=${activeMapId}`)}
+                  onClick={() => router.push(`/canvas-editor?edit=${activeMapId}`)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 10, textDecoration: 'underline' }}>
                   編集
                 </button>
@@ -2320,7 +2320,7 @@ export default function CoverDesignerPage() {
             {/* Saved maps list */}
             {savedMaps.length === 0 ? (
               <div style={{ fontSize: 11, color: '#555', textAlign: 'center', padding: '8px 0' }}>
-                マップエディタで背景を保存してください
+                キャンバスエディタで背景を保存してください
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -2346,7 +2346,7 @@ export default function CoverDesignerPage() {
                         {isRenderingMap && activeMapId !== map.id ? '...' : '適用'}
                       </button>
                       <button
-                        onClick={() => router.push(`/map-editor?edit=${map.id}`)}
+                        onClick={() => router.push(`/canvas-editor?edit=${map.id}`)}
                         style={{ ...S.btn(), flex: 1, fontSize: 10, padding: '3px 0' }}>
                         編集
                       </button>

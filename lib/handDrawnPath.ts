@@ -156,9 +156,8 @@ export function buildRailwayObjects(
 
 // ── 川 ───────────────────────────────────────────────────────
 export type RiverOpts = {
-  fillColor: string;
-  strokeColor: string;
-  width: number;    // 川幅 (px)
+  color: string;       // 線の色（淡い水色）
+  strokeWidth: number; // 線幅 (px)
   jitter: number;
 };
 
@@ -168,39 +167,103 @@ export function buildRiverObjects(
   opts: RiverOpts,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any {
-  const { fillColor, strokeColor, width, jitter } = opts;
-
-  // 太いストロークで水面を表現（round cap で自然な端を作る）
-  const body = new fabric.Path(jitteredBezierPathStr(points, jitter), {
+  const { color, strokeWidth, jitter } = opts;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const path: any = new fabric.Path(jitteredBezierPathStr(points, jitter), {
     fill: 'transparent',
-    stroke: fillColor,
-    strokeWidth: width,
+    stroke: color,
+    strokeWidth,
     strokeLineCap: 'round',
     strokeLineJoin: 'round',
     strokeUniform: true,
-    selectable: false,
-    evented: false,
+    selectable: true,
   });
+  path._mapLineType = 'river';
+  return path;
+}
 
-  // 両岸の輪郭線（少し控えめなジッターで独立した揺れを加える）
-  const hw = width / 2 - 1;
-  const bankOpts = {
-    fill: 'transparent',
-    stroke: strokeColor,
-    strokeWidth: 1.5,
-    strokeLineCap: 'round',
-    strokeLineJoin: 'round',
-    strokeUniform: true,
-    selectable: false,
-    evented: false,
-  };
-  const bank1 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points, -hw), jitter * 0.7), bankOpts);
-  const bank2 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points,  hw), jitter * 0.7), bankOpts);
+// ── 橋 ───────────────────────────────────────────────────────
+export type BridgeOpts = {
+  color: string;
+  hatchLength: number; // ハッチ線の長さ (px)
+  hatchGap: number;    // ハッチ間隔 (px)
+  strokeWidth: number; // ハッチ線の太さ (px)
+};
+
+export function buildBridgeObjects(
+  fabric: FabricLib,
+  points: Point[],
+  opts: BridgeOpts,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any | null {
+  const { color, hatchLength, hatchGap, strokeWidth } = opts;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hatches: any[] = [];
+  let remaining = hatchGap * 0.5; // 最初のセグメントのオフセット
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1], curr = points[i];
+    const dx = curr.x - prev.x, dy = curr.y - prev.y;
+    const segLen = Math.sqrt(dx * dx + dy * dy);
+    if (segLen < 0.001) continue;
+    const ux = dx / segLen, uy = dy / segLen;
+    const nx = -uy, ny = ux;
+
+    let t = remaining;
+    while (t <= segLen) {
+      const mx = prev.x + ux * t, my = prev.y + uy * t;
+      const h = new fabric.Line(
+        [mx - nx * hatchLength / 2, my - ny * hatchLength / 2,
+         mx + nx * hatchLength / 2, my + ny * hatchLength / 2],
+        { stroke: color, strokeWidth, strokeUniform: true, selectable: false, evented: false },
+      );
+      hatches.push(h);
+      t += hatchGap;
+    }
+    remaining = t - segLen;
+  }
+
+  if (hatches.length === 0) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const group: any = new fabric.Group(hatches, { selectable: true });
+  group._mapLineType = 'bridge';
+  return group;
+}
+
+// ── 広場・オープンスペース ────────────────────────────────────
+export type PlazaOpts = {
+  color: string;
+  strokeWidth: number;
+  dashLen: number;
+  dashGap: number;
+};
+
+export function buildPlazaObjects(
+  fabric: FabricLib,
+  pt1: Point,
+  pt2: Point,
+  opts: PlazaOpts,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any | null {
+  const { color, strokeWidth, dashLen, dashGap } = opts;
+  const left   = Math.min(pt1.x, pt2.x);
+  const top    = Math.min(pt1.y, pt2.y);
+  const width  = Math.abs(pt2.x - pt1.x);
+  const height = Math.abs(pt2.y - pt1.y);
+  if (width < 2 || height < 2) return null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const group: any = new fabric.Group([body, bank1, bank2], { selectable: true });
-  group._mapLineType = 'river';
-  return group;
+  const rect: any = new fabric.Rect({
+    left, top, width, height,
+    fill: 'transparent',
+    stroke: color,
+    strokeWidth,
+    strokeDashArray: [dashLen, dashGap],
+    strokeUniform: true,
+    selectable: true,
+  });
+  rect._mapLineType = 'plaza';
+  return rect;
 }
 
 // ── 閉じた Catmull-Rom スプライン（緑地・閉じた多角形用） ────

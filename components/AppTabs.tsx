@@ -33,16 +33,16 @@ export default function AppTabs({ onBeforeNavigate }: { onBeforeNavigate?: () =>
         スタンプエディタ
       </button>
       <button
+        style={TAB_STYLE(pathname === '/canvas-editor')}
+        onClick={() => navigate('/canvas-editor')}
+      >
+        キャンバスエディタ
+      </button>
+      <button
         style={TAB_STYLE(pathname === '/cover-designer')}
         onClick={() => navigate('/cover-designer')}
       >
         カバーデザイナー
-      </button>
-      <button
-        style={TAB_STYLE(pathname === '/map-editor')}
-        onClick={() => navigate('/map-editor')}
-      >
-        マップエディター
       </button>
     </div>
   );

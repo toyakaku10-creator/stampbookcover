@@ -22,10 +22,10 @@ export default function Home() {
             <span className="text-sm font-medium">カバーデザイナー</span>
           </div>
         </Link>
-        <Link href="/map-editor">
+        <Link href="/canvas-editor">
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }} className="flex flex-col items-center gap-3 px-10 py-8 hover:border-[var(--accent)] transition-colors cursor-pointer">
             <Map size={32} color="var(--accent)" />
-            <span className="text-sm font-medium">マップエディター</span>
+            <span className="text-sm font-medium">キャンバスエディタ</span>
           </div>
         </Link>
       </div>

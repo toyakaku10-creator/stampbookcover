@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { MousePointer2, Undo2, Trash2, Download, Upload } from 'lucide-react';
+import { MousePointer2, Undo2, Trash2, Download, Upload, Maximize2, X } from 'lucide-react';
 import { getStamps } from '@/lib/stampStorage';
 import type { Stamp } from '@/lib/types';
 import AppHeader from '@/components/AppHeader';
@@ -56,14 +56,13 @@ function parseRgba(s: string): { color: string; alpha: number } {
 }
 
 // ── サイズプリセット (mm) ─────────────────────────────────────
-type CanvasPreset = { id: string; label: string; sub: string; mmW: number; mmH: number };
+type CanvasPreset = { name: string; mmW: number; mmH: number };
 const CANVAS_PRESETS: CanvasPreset[] = [
-  { id: 'bookcover', label: 'ブックカバー', sub: '385 × 152 mm',  mmW: 385, mmH: 152 },
-  { id: 'a4p',       label: 'A4 縦',        sub: '210 × 297 mm',  mmW: 210, mmH: 297 },
-  { id: 'a4l',       label: 'A4 横',        sub: '297 × 210 mm',  mmW: 297, mmH: 210 },
-  { id: 'b5p',       label: 'B5 縦',        sub: '182 × 257 mm',  mmW: 182, mmH: 257 },
-  { id: 'square',    label: '正方形',        sub: '200 × 200 mm',  mmW: 200, mmH: 200 },
-  { id: 'custom',    label: 'カスタム',      sub: 'mm で直接入力', mmW: 200, mmH: 200 },
+  { name: 'ブックカバー（応募サイズ）', mmW: 385, mmH: 152 },
+  { name: 'A4 縦',                      mmW: 210, mmH: 297 },
+  { name: 'A4 横',                      mmW: 297, mmH: 210 },
+  { name: 'B5 縦',                      mmW: 182, mmH: 257 },
+  { name: '正方形',                     mmW: 200, mmH: 200 },
 ];
 const DEFAULT_PRESET = CANVAS_PRESETS[0]; // ブックカバーがデフォルト
 
@@ -259,11 +258,12 @@ export default function MapEditor() {
   useEffect(() => { selFillOpRef.current = selFillOp; }, [selFillOp]);
 
   // ── キャンバスサイズ (mm) ──────────────────────────────────
-  const [canvasPresetId, setCanvasPresetId] = useState(DEFAULT_PRESET.id);
+  const [showSizeModal,  setShowSizeModal]  = useState(false);
+  const [activeSizeName, setActiveSizeName] = useState(DEFAULT_PRESET.name);
   const [canvasMmW, setCanvasMmW] = useState(DEFAULT_PRESET.mmW);
   const [canvasMmH, setCanvasMmH] = useState(DEFAULT_PRESET.mmH);
-  const [customMmW, setCustomMmW] = useState(String(DEFAULT_PRESET.mmW));
-  const [customMmH, setCustomMmH] = useState(String(DEFAULT_PRESET.mmH));
+  const [customMmW, setCustomMmW] = useState(DEFAULT_PRESET.mmW);
+  const [customMmH, setCustomMmH] = useState(DEFAULT_PRESET.mmH);
   const [pxInfo,    setPxInfo]    = useState(INIT);
 
   const canvasMmWRef  = useRef(DEFAULT_PRESET.mmW);
@@ -784,24 +784,6 @@ export default function MapEditor() {
     saveHistory();
   }, [saveHistory]);
 
-  const handlePresetSelect = useCallback((preset: CanvasPreset) => {
-    setCanvasPresetId(preset.id);
-    if (preset.id === 'custom') {
-      setCustomMmW(String(canvasMmWRef.current));
-      setCustomMmH(String(canvasMmHRef.current));
-    } else {
-      setCustomMmW(String(preset.mmW));
-      setCustomMmH(String(preset.mmH));
-      applyCanvasSize(preset.mmW, preset.mmH);
-    }
-  }, [applyCanvasSize]);
-
-  const applyCustomSize = useCallback(() => {
-    const mmW = Math.max(10, Math.min(1200, parseFloat(customMmW) || canvasMmWRef.current));
-    const mmH = Math.max(10, Math.min(1200, parseFloat(customMmH) || canvasMmHRef.current));
-    setCustomMmW(String(mmW)); setCustomMmH(String(mmH));
-    applyCanvasSize(mmW, mmH);
-  }, [customMmW, customMmH, applyCanvasSize]);
 
   // ── キャンバス初期化 ───────────────────────────────────────
   useEffect(() => {
@@ -1220,51 +1202,16 @@ export default function MapEditor() {
           {/* ════ キャンバス設定 ════ */}
           <div style={S.sectionHead}>キャンバス設定</div>
 
-          {/* サイズプリセット */}
-          <div>
-            <div style={S.lbl}>サイズ</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
-              {CANVAS_PRESETS.map(p => (
-                <button key={p.id} onClick={() => handlePresetSelect(p)}
-                  style={{ padding: '4px 3px', fontSize: 10, borderRadius: 5, border: 'none',
-                            cursor: 'pointer', textAlign: 'center', lineHeight: 1.35,
-                            background: canvasPresetId === p.id ? 'var(--accent)' : 'var(--bg)',
-                            color: canvasPresetId === p.id ? '#0F2340' : 'var(--text)' }}>
-                  <span style={{ fontWeight: 700, display: 'block' }}>{p.label}</span>
-                  <span style={{ fontSize: 9, opacity: 0.75 }}>{p.sub}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* カスタムサイズ */}
-          {canvasPresetId === 'custom' && (
-            <div>
-              <div style={S.lbl}>mm で指定</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 4 }}>
-                <input type="number" min={10} max={1200} step={1} value={customMmW}
-                  onChange={e => setCustomMmW(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && applyCustomSize()}
-                  style={{ ...S.input, width: 58, textAlign: 'center' }} placeholder="W" />
-                <span style={{ fontSize: 10, color: '#888', flexShrink: 0 }}>×</span>
-                <input type="number" min={10} max={1200} step={1} value={customMmH}
-                  onChange={e => setCustomMmH(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && applyCustomSize()}
-                  style={{ ...S.input, width: 58, textAlign: 'center' }} placeholder="H" />
-                <span style={{ fontSize: 10, color: '#888', flexShrink: 0 }}>mm</span>
-              </div>
-              <button onClick={applyCustomSize} style={S.btn('accent')}>適用</button>
-            </div>
-          )}
-
-          {/* キャンバス情報 */}
-          <div style={{ fontSize: 10, color: '#888', lineHeight: 1.6, background: 'var(--bg)',
-                        borderRadius: 5, padding: '4px 7px' }}>
-            <span style={{ color: 'var(--text)', fontWeight: 600 }}>{canvasMmW} × {canvasMmH} mm</span><br />
-            表示: {pxInfo.pxW} × {pxInfo.pxH} px<br />
-            書き出し: 約 {Math.round(pxInfo.pxW * pxInfo.mult)} × {Math.round(pxInfo.pxH * pxInfo.mult)} px
-            <span style={{ color: 'var(--accent)', marginLeft: 4 }}>(300 DPI)</span>
-          </div>
+          {/* サイズ変更ボタン */}
+          <button onClick={() => setShowSizeModal(true)}
+            style={{ ...S.btn(), justifyContent: 'space-between', padding: '6px 10px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Maximize2 size={12} /> サイズ変更
+            </span>
+            <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>
+              {canvasMmW}×{canvasMmH}mm
+            </span>
+          </button>
 
           {/* 背景色 */}
           <div>
@@ -1744,6 +1691,70 @@ export default function MapEditor() {
           </button>
         </div>
       </div>
+
+      {/* ══ サイズ設定モーダル ══════════════════════════════════ */}
+      {showSizeModal && (
+        <div onClick={() => setShowSizeModal(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+                   display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', borderRadius: 12, padding: 24,
+                     width: 300, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>サイズ設定</span>
+              <button onClick={() => setShowSizeModal(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer',
+                         color: 'var(--text)', padding: 4, borderRadius: 4 }}>
+                <X size={14} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {CANVAS_PRESETS.map(p => (
+                <button key={p.name} onClick={() => {
+                  setActiveSizeName(p.name);
+                  applyCanvasSize(p.mmW, p.mmH);
+                  setShowSizeModal(false);
+                }} style={{
+                  ...S.btn(),
+                  justifyContent: 'space-between',
+                  border: `1px solid ${activeSizeName === p.name ? '#C9A84C' : 'var(--border)'}`,
+                  color: activeSizeName === p.name ? '#C9A84C' : 'var(--text)',
+                  background: activeSizeName === p.name ? 'rgba(201,168,76,0.1)' : 'var(--bg)',
+                }}>
+                  <span>{p.name}</span>
+                  <span style={{ fontSize: 10, color: '#888' }}>{p.mmW}×{p.mmH}mm</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+              <div style={{ ...S.lbl, marginBottom: 8 }}>カスタムサイズ</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ ...S.lbl, marginBottom: 2 }}>幅 mm</div>
+                  <input type="number" value={customMmW} min={50} max={1200}
+                    onChange={e => setCustomMmW(Number(e.target.value))}
+                    style={{ width: '100%', ...S.input }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ ...S.lbl, marginBottom: 2 }}>高さ mm</div>
+                  <input type="number" value={customMmH} min={50} max={1200}
+                    onChange={e => setCustomMmH(Number(e.target.value))}
+                    style={{ width: '100%', ...S.input }} />
+                </div>
+              </div>
+              <button onClick={() => {
+                const mmW = Math.max(50, Math.min(1200, customMmW || canvasMmWRef.current));
+                const mmH = Math.max(50, Math.min(1200, customMmH || canvasMmHRef.current));
+                setActiveSizeName('カスタム');
+                applyCanvasSize(mmW, mmH);
+                setShowSizeModal(false);
+              }} style={{ ...S.btn(), width: '100%' }}>
+                このサイズを適用
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

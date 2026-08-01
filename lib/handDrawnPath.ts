@@ -202,3 +202,54 @@ export function buildRiverObjects(
   group._mapLineType = 'river';
   return group;
 }
+
+// ── 閉じた Catmull-Rom スプライン（緑地・閉じた多角形用） ────
+// 先頭と末尾が繋がるように周回インデックスで制御点を計算する
+export function jitteredBezierClosedPathStr(points: Point[], jitterAmt: number): string {
+  const n = points.length;
+  if (n < 3) return '';
+  const rng = () => (Math.random() - 0.5) * 2 * jitterAmt;
+  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = points[(i - 1 + n) % n];
+    const p1 = points[i];
+    const p2 = points[(i + 1) % n];
+    const p3 = points[(i + 2) % n];
+    const cp1x = p1.x + (p2.x - p0.x) / 6 + rng();
+    const cp1y = p1.y + (p2.y - p0.y) / 6 + rng();
+    const cp2x = p2.x - (p3.x - p1.x) / 6 + rng();
+    const cp2y = p2.y - (p3.y - p1.y) / 6 + rng();
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)} ${cp2x.toFixed(1)} ${cp2y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d + ' Z';
+}
+
+// ── 緑地（公園・森） ─────────────────────────────────────────
+export type GreenAreaOpts = {
+  fillColor: string;   // rgba 文字列（半透明可）
+  strokeColor: string;
+  strokeWidth: number;
+  jitter: number;
+};
+
+export function buildGreenAreaObjects(
+  fabric: FabricLib,
+  points: Point[],
+  opts: GreenAreaOpts,
+): any { // eslint-disable-line @typescript-eslint/no-explicit-any
+  if (points.length < 3) return null;
+  const { fillColor, strokeColor, strokeWidth, jitter } = opts;
+  const d = jitteredBezierClosedPathStr(points, jitter);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const path: any = new fabric.Path(d, {
+    fill: fillColor,
+    stroke: strokeColor,
+    strokeWidth,
+    strokeLineCap: 'round',
+    strokeLineJoin: 'round',
+    strokeUniform: true,
+    selectable: true,
+  });
+  path._mapLineType = 'greenarea';
+  return path;
+}

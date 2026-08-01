@@ -10,40 +10,47 @@ import {
   buildRoadObjects,
   buildRailwayObjects,
   buildRiverObjects,
+  buildGreenAreaObjects,
   type Point,
 } from '@/lib/handDrawnPath';
 
 // ── DPI 変換 ─────────────────────────────────────────────────
-// 表示キャンバスは 72 DPI で作成。書き出し時に 300 DPI 相当まで拡大する。
 const DISPLAY_DPI = 72;
 const PRINT_DPI   = 300;
-const MAX_PX_W    = 820; // 表示エリアに収まる最大幅
-const MAX_PX_H    = 560; // 表示エリアに収まる最大高
+const MAX_PX_W    = 820;
+const MAX_PX_H    = 560;
 
-/** mm → 表示px への変換 + 書き出し倍率を返す */
 function computeCanvas(mmW: number, mmH: number) {
   const rawW = (mmW * DISPLAY_DPI) / 25.4;
   const rawH = (mmH * DISPLAY_DPI) / 25.4;
-  // 画面に収まるようにスケールダウン（1.0 以下に制限）
   const fit  = Math.min(MAX_PX_W / rawW, MAX_PX_H / rawH, 1.0);
-  const pxW  = Math.round(rawW * fit);
-  const pxH  = Math.round(rawH * fit);
-  // 書き出し倍率: (300 DPI / 72 DPI) / fitScale = 300 DPI 相当
-  const mult = (PRINT_DPI / DISPLAY_DPI) / fit;
-  return { pxW, pxH, mult };
+  return {
+    pxW:  Math.round(rawW * fit),
+    pxH:  Math.round(rawH * fit),
+    mult: (PRINT_DPI / DISPLAY_DPI) / fit,
+  };
 }
 
-// ── サイズプリセット (mm) ──────────────────────────────────
+/** hex (#rrggbb) + alpha (0‑1) → rgba 文字列 */
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ── サイズプリセット (mm) ─────────────────────────────────────
 type CanvasPreset = { id: string; label: string; sub: string; mmW: number; mmH: number };
 const CANVAS_PRESETS: CanvasPreset[] = [
-  { id: 'bookcover', label: 'ブックカバー', sub: '385 × 152 mm',   mmW: 385, mmH: 152 },
-  { id: 'a4p',       label: 'A4 縦',        sub: '210 × 297 mm',   mmW: 210, mmH: 297 },
-  { id: 'a4l',       label: 'A4 横',        sub: '297 × 210 mm',   mmW: 297, mmH: 210 },
-  { id: 'b5p',       label: 'B5 縦',        sub: '182 × 257 mm',   mmW: 182, mmH: 257 },
-  { id: 'square',    label: '正方形',        sub: '200 × 200 mm',   mmW: 200, mmH: 200 },
-  { id: 'custom',    label: 'カスタム',      sub: 'mm で直接入力',  mmW: 200, mmH: 200 },
+  { id: 'bookcover', label: 'ブックカバー', sub: '385 × 152 mm',  mmW: 385, mmH: 152 },
+  { id: 'a4p',       label: 'A4 縦',        sub: '210 × 297 mm',  mmW: 210, mmH: 297 },
+  { id: 'a4l',       label: 'A4 横',        sub: '297 × 210 mm',  mmW: 297, mmH: 210 },
+  { id: 'b5p',       label: 'B5 縦',        sub: '182 × 257 mm',  mmW: 182, mmH: 257 },
+  { id: 'square',    label: '正方形',        sub: '200 × 200 mm',  mmW: 200, mmH: 200 },
+  { id: 'custom',    label: 'カスタム',      sub: 'mm で直接入力', mmW: 200, mmH: 200 },
 ];
-const DEFAULT_PRESET = CANVAS_PRESETS[0]; // ブックカバー
+const DEFAULT_PRESET = CANVAS_PRESETS[0]; // ブックカバーがデフォルト
 
 // ── 背景色プリセット ─────────────────────────────────────────
 const BG_COLOR_PRESETS = [
@@ -58,12 +65,17 @@ const BG_COLOR_PRESETS = [
 ];
 const DEFAULT_BG = '#F5F0E8';
 
-const DRAWING_TOOLS = ['road', 'railway', 'river'] as const;
+// ── ツール定義 ────────────────────────────────────────────────
+const DRAWING_TOOLS = ['road', 'railway', 'river', 'greenarea'] as const;
 const MAP_EXTRA_PROPS = ['_mapLineType', '_isBgImage', '_mapStampId'];
 
-type MapTool = 'select' | 'road' | 'railway' | 'river' | 'stamp';
+type MapTool = 'select' | 'road' | 'railway' | 'river' | 'greenarea' | 'stamp';
 
-// ── スタイル ─────────────────────────────────────────────────
+// 緑地のみ確定に 3 点以上必要（閉じた多角形）
+const MIN_ANCHOR: Record<string, number> = { greenarea: 3 };
+function minAnchor(tool: MapTool) { return MIN_ANCHOR[tool] ?? 2; }
+
+// ── スタイル定数 ─────────────────────────────────────────────
 const S = {
   toolBtn: (active: boolean): React.CSSProperties => ({
     width: 40, height: 40, borderRadius: 8, border: 'none',
@@ -95,13 +107,14 @@ const S = {
 };
 
 // ── アイコン ─────────────────────────────────────────────────
-const RoadIcon    = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}><line x1="2" y1="7" x2="18" y2="7"/><line x1="2" y1="13" x2="18" y2="13"/></svg>;
-const RailwayIcon = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6}><line x1="4" y1="4" x2="4" y2="16"/><line x1="16" y1="4" x2="16" y2="16"/><line x1="4" y1="7" x2="16" y2="7"/><line x1="4" y1="10" x2="16" y2="10"/><line x1="4" y1="13" x2="16" y2="13"/></svg>;
-const RiverIcon   = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M2 7 Q5 5 8 7 Q11 9 14 7 Q17 5 18 7"/><path d="M2 13 Q5 11 8 13 Q11 15 14 13 Q17 11 18 13"/></svg>;
-const StampIcon   = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6}><circle cx="10" cy="8" r="4.5"/><rect x="6" y="14" width="8" height="2.5" rx="1"/><line x1="10" y1="12.5" x2="10" y2="14"/></svg>;
+const RoadIcon      = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}><line x1="2" y1="7" x2="18" y2="7"/><line x1="2" y1="13" x2="18" y2="13"/></svg>;
+const RailwayIcon   = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6}><line x1="4" y1="4" x2="4" y2="16"/><line x1="16" y1="4" x2="16" y2="16"/><line x1="4" y1="7" x2="16" y2="7"/><line x1="4" y1="10" x2="16" y2="10"/><line x1="4" y1="13" x2="16" y2="13"/></svg>;
+const RiverIcon     = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M2 7 Q5 5 8 7 Q11 9 14 7 Q17 5 18 7"/><path d="M2 13 Q5 11 8 13 Q11 15 14 13 Q17 11 18 13"/></svg>;
+const GreenAreaIcon = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="rgba(125,195,107,0.35)" stroke="currentColor" strokeWidth={1.5}><path d="M10 3 Q14 5 16 9 Q17 14 13 16 Q8 18 5 15 Q2 11 4 7 Q7 3 10 3 Z"/></svg>;
+const StampIcon     = () => <svg viewBox="0 0 20 20" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.6}><circle cx="10" cy="8" r="4.5"/><rect x="6" y="14" width="8" height="2.5" rx="1"/><line x1="10" y1="12.5" x2="10" y2="14"/></svg>;
 
-// ── 初期値計算 ────────────────────────────────────────────────
-const INIT_CANVAS = computeCanvas(DEFAULT_PRESET.mmW, DEFAULT_PRESET.mmH);
+// ── 初期計算 ─────────────────────────────────────────────────
+const INIT = computeCanvas(DEFAULT_PRESET.mmW, DEFAULT_PRESET.mmH);
 
 export default function MapEditor() {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
@@ -118,7 +131,7 @@ export default function MapEditor() {
   const [anchorCount, setAnchorCount] = useState(0);
   const previewObjsRef = useRef<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-  // ── 線プロパティ ───────────────────────────────────────────
+  // ── 線・共通プロパティ ─────────────────────────────────────
   const [lineColor,   setLineColor]   = useState('#C8B89A');
   const [strokeWidth, setStrokeWidth] = useState(8);
   const [jitterAmt,   setJitterAmt]   = useState(3);
@@ -149,20 +162,35 @@ export default function MapEditor() {
   useEffect(() => { riverFillRef.current   = riverFill;   }, [riverFill]);
   useEffect(() => { riverStrokeRef.current = riverStroke; }, [riverStroke]);
 
+  // ── 緑地プロパティ ─────────────────────────────────────────
+  const [greenFill,        setGreenFill]        = useState('#7DC36B');
+  const [greenFillOpacity, setGreenFillOpacity] = useState(0.25);
+  const [greenStroke,      setGreenStroke]      = useState('#4A8A3C');
+  const [greenStrokeW,     setGreenStrokeW]     = useState(2);
+
+  const greenFillRef        = useRef('#7DC36B');
+  const greenFillOpacityRef = useRef(0.25);
+  const greenStrokeRef      = useRef('#4A8A3C');
+  const greenStrokeWRef     = useRef(2);
+
+  useEffect(() => { greenFillRef.current        = greenFill;        }, [greenFill]);
+  useEffect(() => { greenFillOpacityRef.current = greenFillOpacity; }, [greenFillOpacity]);
+  useEffect(() => { greenStrokeRef.current      = greenStroke;      }, [greenStroke]);
+  useEffect(() => { greenStrokeWRef.current     = greenStrokeW;     }, [greenStrokeW]);
+
   // ── キャンバスサイズ (mm) ──────────────────────────────────
   const [canvasPresetId, setCanvasPresetId] = useState(DEFAULT_PRESET.id);
   const [canvasMmW, setCanvasMmW] = useState(DEFAULT_PRESET.mmW);
   const [canvasMmH, setCanvasMmH] = useState(DEFAULT_PRESET.mmH);
   const [customMmW, setCustomMmW] = useState(String(DEFAULT_PRESET.mmW));
   const [customMmH, setCustomMmH] = useState(String(DEFAULT_PRESET.mmH));
-  // 表示用の px 情報（ラベル表示に使う）
-  const [pxInfo, setPxInfo] = useState(INIT_CANVAS);
+  const [pxInfo,    setPxInfo]    = useState(INIT);
 
-  const canvasMmWRef = useRef(DEFAULT_PRESET.mmW);
-  const canvasMmHRef = useRef(DEFAULT_PRESET.mmH);
-  const canvasPxWRef = useRef(INIT_CANVAS.pxW);
-  const canvasPxHRef = useRef(INIT_CANVAS.pxH);
-  const exportMultRef = useRef(INIT_CANVAS.mult);
+  const canvasMmWRef  = useRef(DEFAULT_PRESET.mmW);
+  const canvasMmHRef  = useRef(DEFAULT_PRESET.mmH);
+  const canvasPxWRef  = useRef(INIT.pxW);
+  const canvasPxHRef  = useRef(INIT.pxH);
+  const exportMultRef = useRef(INIT.mult);
 
   useEffect(() => { canvasMmWRef.current = canvasMmW; }, [canvasMmW]);
   useEffect(() => { canvasMmHRef.current = canvasMmH; }, [canvasMmH]);
@@ -225,16 +253,15 @@ export default function MapEditor() {
       const { json, bgColor: savedBg, mmW, mmH } =
         JSON.parse(historyRef.current[historyIdxRef.current]);
       if (mmW && mmH) {
-        const { pxW, pxH, mult } = computeCanvas(mmW, mmH);
-        canvas.setDimensions({ width: pxW, height: pxH });
-        canvasPxWRef.current  = pxW;
-        canvasPxHRef.current  = pxH;
-        exportMultRef.current = mult;
+        const c = computeCanvas(mmW, mmH);
+        canvas.setDimensions({ width: c.pxW, height: c.pxH });
+        canvasPxWRef.current  = c.pxW;
+        canvasPxHRef.current  = c.pxH;
+        exportMultRef.current = c.mult;
         canvasMmWRef.current  = mmW;
         canvasMmHRef.current  = mmH;
-        setCanvasMmW(mmW);
-        setCanvasMmH(mmH);
-        setPxInfo({ pxW, pxH, mult });
+        setCanvasMmW(mmW); setCanvasMmH(mmH);
+        setPxInfo(c);
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (canvas.loadFromJSON(json) as any).then(() => {
@@ -260,12 +287,9 @@ export default function MapEditor() {
     const pts = anchorPointsRef.current;
     if (pts.length === 0) { canvas.renderAll(); return; }
 
-    const previewStyle = {
-      stroke: '#4A90E2', strokeWidth: 1.5,
-      fill: 'transparent', strokeDashArray: [6, 3],
-      selectable: false, evented: false,
-    };
+    const isGreenArea = mapToolRef.current === 'greenarea';
 
+    // アンカー点ドット
     pts.forEach(p => {
       const dot = new fabric.Circle({
         left: p.x, top: p.y, originX: 'center', originY: 'center',
@@ -278,9 +302,24 @@ export default function MapEditor() {
 
     const previewPts = mousePt ? [...pts, mousePt] : pts;
     if (previewPts.length >= 2) {
-      const path = new fabric.Path(jitteredBezierPathStr(previewPts, 0), previewStyle);
+      const d = jitteredBezierPathStr(previewPts, 0);
+      const path = new fabric.Path(d, {
+        stroke: '#4A90E2', strokeWidth: 1.5,
+        fill: isGreenArea ? 'rgba(125,195,107,0.15)' : 'transparent',
+        strokeDashArray: [6, 3], selectable: false, evented: false,
+      });
       previewObjsRef.current.push(path);
       canvas.add(path);
+
+      // 緑地: マウス位置から最初の点への補助線（閉じるラインの予告）
+      if (isGreenArea && pts.length >= 2 && mousePt) {
+        const closing = new fabric.Line([mousePt.x, mousePt.y, pts[0].x, pts[0].y], {
+          stroke: '#4A90E2', strokeWidth: 1, strokeDashArray: [3, 3],
+          selectable: false, evented: false,
+        });
+        previewObjsRef.current.push(closing);
+        canvas.add(closing);
+      }
     } else if (pts.length === 1 && mousePt) {
       const line = new fabric.Line([pts[0].x, pts[0].y, mousePt.x, mousePt.y], {
         stroke: '#4A90E2', strokeWidth: 1, strokeDashArray: [4, 3],
@@ -302,8 +341,10 @@ export default function MapEditor() {
     previewObjsRef.current.forEach(o => canvas.remove(o));
     previewObjsRef.current = [];
 
-    if (pts.length >= 2) {
-      const tool = mapToolRef.current;
+    const tool  = mapToolRef.current;
+    const enoughPts = pts.length >= minAnchor(tool);
+
+    if (enoughPts) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let objs: any[] = [];
       if (tool === 'road') {
@@ -321,6 +362,14 @@ export default function MapEditor() {
           fillColor: riverFillRef.current, strokeColor: riverStrokeRef.current,
           width: riverWidthRef.current, jitter: jitterAmtRef.current,
         })];
+      } else if (tool === 'greenarea') {
+        const g = buildGreenAreaObjects(fabric, pts, {
+          fillColor:   hexToRgba(greenFillRef.current, greenFillOpacityRef.current),
+          strokeColor: greenStrokeRef.current,
+          strokeWidth: greenStrokeWRef.current,
+          jitter:      jitterAmtRef.current,
+        });
+        if (g) objs = [g];
       }
       objs.forEach(o => canvas.add(o));
       canvas.renderAll();
@@ -341,27 +390,24 @@ export default function MapEditor() {
 
   // ── キャンバスサイズ変更 ───────────────────────────────────
   const applyCanvasSize = useCallback((mmW: number, mmH: number) => {
-    const { pxW, pxH, mult } = computeCanvas(mmW, mmH);
-    canvasPxWRef.current  = pxW;
-    canvasPxHRef.current  = pxH;
-    exportMultRef.current = mult;
+    const c = computeCanvas(mmW, mmH);
+    canvasPxWRef.current  = c.pxW;
+    canvasPxHRef.current  = c.pxH;
+    exportMultRef.current = c.mult;
     canvasMmWRef.current  = mmW;
     canvasMmHRef.current  = mmH;
-    setCanvasMmW(mmW);
-    setCanvasMmH(mmH);
-    setPxInfo({ pxW, pxH, mult });
+    setCanvasMmW(mmW); setCanvasMmH(mmH);
+    setPxInfo(c);
 
     const canvas = fabricRef.current;
     if (!canvas) return;
-    canvas.setDimensions({ width: pxW, height: pxH });
+    canvas.setDimensions({ width: c.pxW, height: c.pxH });
 
-    // 背景画像をリスケール（キャンバスにフィット）
     const img = bgImageObjRef.current;
     if (img) {
-      const nw = img.width  as number;
-      const nh = img.height as number;
+      const nw = img.width as number, nh = img.height as number;
       if (nw && nh) {
-        const scale = Math.min(pxW / nw, pxH / nh);
+        const scale = Math.min(c.pxW / nw, c.pxH / nh);
         img.set({ scaleX: scale, scaleY: scale, left: 0, top: 0 });
       }
     }
@@ -372,7 +418,6 @@ export default function MapEditor() {
   const handlePresetSelect = useCallback((preset: CanvasPreset) => {
     setCanvasPresetId(preset.id);
     if (preset.id === 'custom') {
-      // カスタム選択時は現在の mm 値を引き継ぐ
       setCustomMmW(String(canvasMmWRef.current));
       setCustomMmH(String(canvasMmHRef.current));
     } else {
@@ -385,8 +430,7 @@ export default function MapEditor() {
   const applyCustomSize = useCallback(() => {
     const mmW = Math.max(10, Math.min(1200, parseFloat(customMmW) || canvasMmWRef.current));
     const mmH = Math.max(10, Math.min(1200, parseFloat(customMmH) || canvasMmHRef.current));
-    setCustomMmW(String(mmW));
-    setCustomMmH(String(mmH));
+    setCustomMmW(String(mmW)); setCustomMmH(String(mmH));
     applyCanvasSize(mmW, mmH);
   }, [customMmW, customMmH, applyCanvasSize]);
 
@@ -470,7 +514,7 @@ export default function MapEditor() {
     };
   }, [saveHistory, updatePreview]);
 
-  // ── ツール切替 → キャンバス設定 ───────────────────────────
+  // ── ツール切替 ────────────────────────────────────────────
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -517,8 +561,7 @@ export default function MapEditor() {
       if (bgImageObjRef.current) canvas.remove(bgImageObjRef.current);
 
       fabric.Image.fromURL(url).then((img: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        const cw = canvasPxWRef.current;
-        const ch = canvasPxHRef.current;
+        const cw = canvasPxWRef.current, ch = canvasPxHRef.current;
         const nw = (img.width  as number) || cw;
         const nh = (img.height as number) || ch;
         const scale = Math.min(cw / nw, ch / nh);
@@ -567,13 +610,22 @@ export default function MapEditor() {
 
   // ── JSX ──────────────────────────────────────────────────
   const isLineTool = (DRAWING_TOOLS as readonly string[]).includes(mapTool);
+
+  const toolLabel: Record<MapTool, string> = {
+    select: '選択', road: '道路', railway: '線路',
+    river: '川', greenarea: '緑地', stamp: 'スタンプ',
+  };
+
   const TOOLS: { id: MapTool; icon: React.ReactNode; title: string }[] = [
-    { id: 'select',  icon: <MousePointer2 size={18} />, title: '選択' },
-    { id: 'road',    icon: <RoadIcon />,                title: '道路' },
-    { id: 'railway', icon: <RailwayIcon />,             title: '線路' },
-    { id: 'river',   icon: <RiverIcon />,               title: '川' },
-    { id: 'stamp',   icon: <StampIcon />,               title: 'スタンプ' },
+    { id: 'select',    icon: <MousePointer2 size={18} />, title: '選択' },
+    { id: 'road',      icon: <RoadIcon />,                title: '道路' },
+    { id: 'railway',   icon: <RailwayIcon />,             title: '線路' },
+    { id: 'river',     icon: <RiverIcon />,               title: '川' },
+    { id: 'greenarea', icon: <GreenAreaIcon />,           title: '緑地（公園・森）' },
+    { id: 'stamp',     icon: <StampIcon />,               title: 'スタンプ' },
   ];
+
+  const canFinalize = anchorCount >= minAnchor(mapTool);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh',
@@ -628,7 +680,7 @@ export default function MapEditor() {
             </div>
           </div>
 
-          {/* カスタムサイズ入力 */}
+          {/* カスタムサイズ */}
           {canvasPresetId === 'custom' && (
             <div>
               <div style={S.lbl}>mm で指定</div>
@@ -648,11 +700,10 @@ export default function MapEditor() {
             </div>
           )}
 
-          {/* 現在のキャンバス情報 */}
+          {/* キャンバス情報 */}
           <div style={{ fontSize: 10, color: '#888', lineHeight: 1.6, background: 'var(--bg)',
                         borderRadius: 5, padding: '4px 7px' }}>
-            <span style={{ color: 'var(--text)', fontWeight: 600 }}>{canvasMmW} × {canvasMmH} mm</span>
-            <br />
+            <span style={{ color: 'var(--text)', fontWeight: 600 }}>{canvasMmW} × {canvasMmH} mm</span><br />
             表示: {pxInfo.pxW} × {pxInfo.pxH} px<br />
             書き出し: 約 {Math.round(pxInfo.pxW * pxInfo.mult)} × {Math.round(pxInfo.pxH * pxInfo.mult)} px
             <span style={{ color: 'var(--accent)', marginLeft: 4 }}>(300 DPI)</span>
@@ -666,9 +717,8 @@ export default function MapEditor() {
                 <button key={p.color} title={p.label} onClick={() => setBgColor(p.color)}
                   style={{ width: 22, height: 22, borderRadius: 4, cursor: 'pointer', padding: 0,
                             background: p.color, flexShrink: 0,
-                            border: bgColor === p.color
-                              ? '2px solid var(--accent)' : '1px solid var(--border)',
-                            outline:      bgColor === p.color ? '1px solid var(--accent)' : 'none',
+                            border: bgColor === p.color ? '2px solid var(--accent)' : '1px solid var(--border)',
+                            outline:       bgColor === p.color ? '1px solid var(--accent)' : 'none',
                             outlineOffset: 1 }} />
               ))}
             </div>
@@ -679,13 +729,12 @@ export default function MapEditor() {
 
           <div style={S.divider} />
 
-          {/* ════ ツール固有プロパティ ════ */}
+          {/* ════ 線ツール プロパティ ════ */}
           {isLineTool && (
             <>
-              <div style={S.sectionHead}>
-                {mapTool === 'road' ? '道路' : mapTool === 'railway' ? '線路' : '川'}
-              </div>
+              <div style={S.sectionHead}>{toolLabel[mapTool]}</div>
 
+              {/* 道路 */}
               {mapTool === 'road' && (
                 <>
                   <div>
@@ -708,6 +757,7 @@ export default function MapEditor() {
                 </>
               )}
 
+              {/* 線路 */}
               {mapTool === 'railway' && (
                 <>
                   <div>
@@ -732,6 +782,7 @@ export default function MapEditor() {
                 </>
               )}
 
+              {/* 川 */}
               {mapTool === 'river' && (
                 <>
                   <div>
@@ -754,6 +805,39 @@ export default function MapEditor() {
                 </>
               )}
 
+              {/* 緑地 */}
+              {mapTool === 'greenarea' && (
+                <>
+                  <div>
+                    <div style={S.lbl}>塗り色</div>
+                    <input type="color" value={greenFill} onChange={e => setGreenFill(e.target.value)}
+                      style={{ width: '100%', height: 28, borderRadius: 5 }} />
+                  </div>
+                  <div>
+                    <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>塗り透明度</span>
+                      <span style={{ color: 'var(--accent)' }}>{Math.round(greenFillOpacity * 100)}%</span>
+                    </div>
+                    <input type="range" min={0} max={1} step={0.05} value={greenFillOpacity}
+                      onChange={e => setGreenFillOpacity(Number(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                  <div>
+                    <div style={S.lbl}>輪郭色</div>
+                    <input type="color" value={greenStroke} onChange={e => setGreenStroke(e.target.value)}
+                      style={{ width: '100%', height: 28, borderRadius: 5 }} />
+                  </div>
+                  <div>
+                    <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>輪郭の太さ</span>
+                      <span style={{ color: 'var(--accent)' }}>{greenStrokeW}px</span>
+                    </div>
+                    <input type="range" min={1} max={10} step={0.5} value={greenStrokeW}
+                      onChange={e => setGreenStrokeW(Number(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                </>
+              )}
+
+              {/* 手ブレ量（共通） */}
               <div>
                 <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
                   <span>手ブレ量</span><span style={{ color: 'var(--accent)' }}>{jitterAmt}px</span>
@@ -764,11 +848,20 @@ export default function MapEditor() {
 
               <div style={S.divider} />
 
+              {/* アンカー点情報 & 確定 / キャンセル */}
               <div style={{ fontSize: 11, color: '#888', textAlign: 'center', lineHeight: 1.5 }}>
-                {anchorCount === 0 ? 'クリックで点を追加' : `アンカー点 ${anchorCount} 個`}
-                {anchorCount >= 2 && <div style={{ fontSize: 10 }}>Enter で確定</div>}
+                {anchorCount === 0
+                  ? mapTool === 'greenarea'
+                    ? 'クリックで頂点を追加（3点以上）'
+                    : 'クリックで点を追加'
+                  : `アンカー点 ${anchorCount} 個`}
+                {canFinalize && (
+                  <div style={{ fontSize: 10, marginTop: 2 }}>
+                    {mapTool === 'greenarea' ? 'Enter で閉じて確定' : 'Enter で確定'}
+                  </div>
+                )}
               </div>
-              {anchorCount >= 2 && (
+              {canFinalize && (
                 <button onClick={finalizePath} style={S.btn('accent')}>確定 (Enter)</button>
               )}
               {anchorCount > 0 && (
@@ -816,6 +909,7 @@ export default function MapEditor() {
             </>
           )}
 
+          {/* 選択モード */}
           {mapTool === 'select' && (
             <div style={{ fontSize: 11, color: '#888', lineHeight: 1.7 }}>
               オブジェクトを選択して<br />移動・削除できます。<br />

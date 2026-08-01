@@ -208,16 +208,46 @@ export default function MapEditor() {
   }, [bgColor]);
 
   // ── 背景画像 ───────────────────────────────────────────────
-  const [bgOpacity,  setBgOpacity]  = useState(0.4);
-  const [hasBgImage, setHasBgImage] = useState(false);
-  const bgOpacityRef  = useRef(0.4);
-  const bgImageObjRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
-  useEffect(() => { bgOpacityRef.current = bgOpacity; }, [bgOpacity]);
+  const [bgOpacity,    setBgOpacity]    = useState(0.4);
+  const [hasBgImage,   setHasBgImage]   = useState(false);
+  const [bgLocked,     setBgLocked]     = useState(true);   // ロック状態（初期: ロック）
+  const [bgAspectLock, setBgAspectLock] = useState(true);   // 縦横比固定
+  const [bgScalePct,   setBgScalePct]   = useState(100);    // 表示用倍率 (%)
+  const [bgScaleInput, setBgScaleInput] = useState('100');  // 入力フィールド用
+
+  const bgOpacityRef    = useRef(0.4);
+  const bgLockedRef     = useRef(true);
+  const bgAspectLockRef = useRef(true);
+  const bgImageObjRef   = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+  useEffect(() => { bgOpacityRef.current    = bgOpacity;    }, [bgOpacity]);
+  useEffect(() => { bgLockedRef.current     = bgLocked;     }, [bgLocked]);
+  useEffect(() => { bgAspectLockRef.current = bgAspectLock; }, [bgAspectLock]);
+
   useEffect(() => {
     if (!bgImageObjRef.current || !fabricRef.current) return;
     bgImageObjRef.current.set({ opacity: bgOpacity });
     fabricRef.current.renderAll();
   }, [bgOpacity]);
+
+  // ロック切り替え → canvas オブジェクトに即時反映
+  useEffect(() => {
+    const img = bgImageObjRef.current;
+    const canvas = fabricRef.current;
+    if (!img || !canvas) return;
+    img.set({ selectable: !bgLocked, evented: !bgLocked, hasControls: !bgLocked });
+    if (bgLocked) canvas.discardActiveObject();
+    canvas.renderAll();
+  }, [bgLocked]);
+
+  // 縦横比ロック切り替え → canvas オブジェクトに即時反映
+  useEffect(() => {
+    const img = bgImageObjRef.current;
+    const canvas = fabricRef.current;
+    if (!img || !canvas) return;
+    img.set({ lockUniScaling: bgAspectLock });
+    canvas.renderAll();
+  }, [bgAspectLock]);
 
   // ── スタンプ ───────────────────────────────────────────────
   const [stamps,        setStamps]        = useState<Stamp[]>([]);
@@ -268,8 +298,21 @@ export default function MapEditor() {
         canvas.backgroundColor = savedBg ?? bgColorRef.current;
         setBgColor(savedBg ?? bgColorRef.current);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        bgImageObjRef.current = canvas.getObjects().find((o: any) => o._isBgImage) ?? null;
-        setHasBgImage(!!bgImageObjRef.current);
+        const restoredBg = canvas.getObjects().find((o: any) => o._isBgImage) ?? null;
+        bgImageObjRef.current = restoredBg;
+        setHasBgImage(!!restoredBg);
+        if (restoredBg) {
+          // JSON から復元した値で UI を同期
+          const locked = !restoredBg.selectable;
+          setBgLocked(locked);
+          bgLockedRef.current = locked;
+          const aspect = !!restoredBg.lockUniScaling;
+          setBgAspectLock(aspect);
+          bgAspectLockRef.current = aspect;
+          const pct = Math.round((restoredBg.scaleX || 1) * 100);
+          setBgScalePct(pct);
+          setBgScaleInput(String(pct));
+        }
         canvas.renderAll();
       });
     } catch { /* ignore */ }
@@ -503,7 +546,14 @@ export default function MapEditor() {
         if (pt) updatePreview({ x: pt.x, y: pt.y });
       });
 
-      canvas.on('object:modified', saveHistory);
+      canvas.on('object:modified', (opt: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        saveHistory();
+        if (opt.target?._isBgImage) {
+          const pct = Math.round((opt.target.scaleX || 1) * 100);
+          setBgScalePct(pct);
+          setBgScaleInput(String(pct));
+        }
+      });
     });
 
     return () => {
@@ -565,19 +615,41 @@ export default function MapEditor() {
         const nw = (img.width  as number) || cw;
         const nh = (img.height as number) || ch;
         const scale = Math.min(cw / nw, ch / nh);
-        img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale,
-                  opacity: bgOpacityRef.current, selectable: false, evented: false });
+        const locked = bgLockedRef.current;
+        img.set({
+          left: 0, top: 0, scaleX: scale, scaleY: scale,
+          opacity: bgOpacityRef.current,
+          selectable: !locked, evented: !locked, hasControls: !locked,
+          lockUniScaling: bgAspectLockRef.current,
+        });
         img._isBgImage = true;
         canvas.add(img);
         canvas.sendObjectToBack(img);
         bgImageObjRef.current = img;
         setHasBgImage(true);
+        const pct = Math.round(scale * 100);
+        setBgScalePct(pct);
+        setBgScaleInput(String(pct));
         canvas.renderAll();
         saveHistory();
       });
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  }, [saveHistory]);
+
+  // 倍率を数値で適用
+  const applyBgScale = useCallback((pctStr: string) => {
+    const img = bgImageObjRef.current;
+    const canvas = fabricRef.current;
+    if (!img || !canvas) return;
+    const pct = Math.max(1, Math.min(500, parseFloat(pctStr) || 100));
+    const s = pct / 100;
+    img.set({ scaleX: s, scaleY: s });
+    setBgScalePct(Math.round(pct));
+    setBgScaleInput(String(Math.round(pct)));
+    canvas.renderAll();
+    saveHistory();
   }, [saveHistory]);
 
   const removeBgImage = useCallback(() => {
@@ -926,6 +998,49 @@ export default function MapEditor() {
           </label>
           {hasBgImage && (
             <>
+              {/* ロック切り替え */}
+              <button
+                onClick={() => setBgLocked(v => !v)}
+                style={{
+                  ...S.btn(bgLocked ? undefined : 'accent'),
+                  justifyContent: 'center', gap: 5,
+                  borderColor: bgLocked ? 'var(--border)' : 'var(--accent)',
+                }}>
+                {bgLocked ? '🔒 ロック中（移動不可）' : '🔓 移動・リサイズ可'}
+              </button>
+
+              {/* 移動・リサイズ時のみ表示するコントロール */}
+              {!bgLocked && (
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={bgAspectLock}
+                      onChange={e => setBgAspectLock(e.target.checked)}
+                      style={{ accentColor: 'var(--accent)' }} />
+                    縦横比を固定
+                  </label>
+                  <div>
+                    <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>倍率</span>
+                      <span style={{ color: 'var(--accent)' }}>{bgScalePct}%</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <input
+                        type="number" min={1} max={500} step={1}
+                        value={bgScaleInput}
+                        onChange={e => setBgScaleInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && applyBgScale(bgScaleInput)}
+                        style={{ ...S.input, flex: 1, textAlign: 'center' }} />
+                      <span style={{ fontSize: 10, color: '#888', alignSelf: 'center' }}>%</span>
+                      <button onClick={() => applyBgScale(bgScaleInput)}
+                        style={{ ...S.btn('accent'), width: 'auto', padding: '3px 8px', fontSize: 10 }}>
+                        適用
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* 不透明度（常に表示） */}
               <div>
                 <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
                   <span>不透明度</span>

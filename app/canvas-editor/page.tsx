@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { MousePointer2, Undo2, Trash2, Download, Upload, Maximize2, X } from 'lucide-react';
+import { MousePointer2, Undo2, Trash2, Download, Upload, Maximize2, X, Magnet } from 'lucide-react';
 import { getStamps } from '@/lib/stampStorage';
 import type { Stamp } from '@/lib/types';
 import AppHeader from '@/components/AppHeader';
@@ -115,6 +115,14 @@ const S = {
       : { background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)' }),
   }),
   divider: { height: 1, background: 'var(--border)', flexShrink: 0 } as React.CSSProperties,
+  // カバーデザイナーと同じツールバーボタンスタイル
+  tbBtn: (active = false): React.CSSProperties => ({
+    background: active ? '#1E4080' : '#1A3358',
+    border: 'none', borderRadius: 6,
+    color: active ? '#C9A84C' : 'var(--text)',
+    padding: '4px 8px', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+  }),
 };
 
 // ── アイコン ─────────────────────────────────────────────────
@@ -336,6 +344,7 @@ export default function MapEditor() {
   // ── 履歴 ───────────────────────────────────────────────────
   const historyRef    = useRef<string[]>([]);
   const historyIdxRef = useRef(0);
+  const [canUndo, setCanUndo] = useState(false);
 
   const saveHistory = useCallback(() => {
     const canvas = fabricRef.current;
@@ -349,11 +358,13 @@ export default function MapEditor() {
     historyRef.current = historyRef.current.slice(0, historyIdxRef.current + 1);
     historyRef.current.push(JSON.stringify(state));
     historyIdxRef.current = historyRef.current.length - 1;
+    setCanUndo(historyIdxRef.current > 0);
   }, []);
 
   const undo = useCallback(() => {
     if (historyIdxRef.current <= 0) return;
     historyIdxRef.current--;
+    setCanUndo(historyIdxRef.current > 0);
     const canvas = fabricRef.current;
     if (!canvas) return;
     try {
@@ -1167,11 +1178,25 @@ export default function MapEditor() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh',
                   background: 'var(--bg)', color: 'var(--text)' }}>
       <AppHeader>
+        {/* ① 編集系 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <button onClick={() => setGridSnap(v => !v)} title={gridSnap ? 'グリッドスナップON' : 'グリッドスナップOFF'}
+            style={S.tbBtn(gridSnap)}
+            onMouseEnter={e => { if (!gridSnap) e.currentTarget.style.background = '#243F66'; }}
+            onMouseLeave={e => { if (!gridSnap) e.currentTarget.style.background = '#1A3358'; }}>
+            <Magnet size={14} />
+          </button>
+          <button onClick={undo} disabled={!canUndo} title="元に戻す (⌘Z)"
+            style={{ ...S.tbBtn(), opacity: canUndo ? 1 : 0.4, cursor: canUndo ? 'pointer' : 'default' }}
+            onMouseEnter={e => { if (canUndo) e.currentTarget.style.background = '#243F66'; }}
+            onMouseLeave={e => { if (canUndo) e.currentTarget.style.background = '#1A3358'; }}>
+            <Undo2 size={14} />
+          </button>
+        </div>
+        <div style={{ width: 1, height: 20, background: '#2A4570' }} />
+        {/* ② サイズ */}
         <button onClick={() => setShowSizeModal(true)} title="サイズ変更"
-          style={{ background: '#1A3358', border: 'none', borderRadius: 6,
-                   color: 'var(--text)', padding: '4px 10px', cursor: 'pointer',
-                   display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
-                   minWidth: 'fit-content' }}
+          style={{ ...S.tbBtn(), minWidth: 'fit-content' }}
           onMouseEnter={e => { e.currentTarget.style.background = '#243F66'; }}
           onMouseLeave={e => { e.currentTarget.style.background = '#1A3358'; }}>
           <Maximize2 size={14} />
@@ -1190,10 +1215,6 @@ export default function MapEditor() {
               {t.icon}
             </button>
           ))}
-          <div style={S.divider} />
-          <button title="元に戻す (⌘Z)" onClick={undo} style={S.toolBtn(false)}>
-            <Undo2 size={18} />
-          </button>
         </div>
 
         {/* ── キャンバスエリア ─────────────────────────────── */}
@@ -1228,23 +1249,16 @@ export default function MapEditor() {
                         cursor: 'pointer' }} />
           </div>
 
-          {/* グリッドスナップ */}
-          <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer' }}>
-              <input type="checkbox" checked={gridSnap} onChange={e => setGridSnap(e.target.checked)}
-                style={{ accentColor: 'var(--accent)' }} />
-              グリッドスナップ
-            </label>
-            {gridSnap && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                <span style={{ fontSize: 10, color: '#888' }}>間隔</span>
-                <input type="number" min={2} max={50} step={1} value={gridSize}
-                  onChange={e => setGridSize(Number(e.target.value) || 10)}
-                  style={{ ...S.input, width: 48, textAlign: 'center' }} />
-                <span style={{ fontSize: 10, color: '#888' }}>px</span>
-              </div>
-            )}
-          </div>
+          {/* グリッド間隔（スナップON時のみ表示） */}
+          {gridSnap && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 10, color: '#888' }}>グリッド間隔</span>
+              <input type="number" min={2} max={50} step={1} value={gridSize}
+                onChange={e => setGridSize(Number(e.target.value) || 10)}
+                style={{ ...S.input, width: 48, textAlign: 'center' }} />
+              <span style={{ fontSize: 10, color: '#888' }}>px</span>
+            </div>
+          )}
 
           <div style={S.divider} />
 

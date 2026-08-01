@@ -2285,10 +2285,10 @@ export default function CoverDesignerPage() {
               style={{ width: '100%', height: 32, borderRadius: 6 }} />
           </div>
 
-          {/* マップ背景セクション */}
+          {/* キャンバス背景セクション */}
           <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)' }}>
             <div style={{ ...S.label, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>マップ背景</span>
+              <span>キャンバス背景</span>
               <button
                 onClick={() => { setSavedMaps(getSavedMaps()); }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: 10 }}
@@ -2298,7 +2298,7 @@ export default function CoverDesignerPage() {
             {/* Active map info */}
             {activeMapId && (
               <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6, textAlign: 'center' }}>
-                ✓ {savedMaps.find(m => m.id === activeMapId)?.name ?? 'マップ背景'}
+                ✓ {savedMaps.find(m => m.id === activeMapId)?.name ?? 'キャンバス背景'}
               </div>
             )}
 

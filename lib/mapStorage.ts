@@ -4,9 +4,6 @@ export type SavedMap = {
   thumbnail: string;     // small JPEG base64 (~200px wide) for list display
   fabricJson: object;    // Fabric.js canvas.toJSON() for re-editing
   bgColor: string;       // canvas background color
-  drawStyle?: 'map' | 'sketch';
-  sketchColor?: string;
-  sketchWidth?: number;
   mmW: number;
   mmH: number;
   createdAt: number;

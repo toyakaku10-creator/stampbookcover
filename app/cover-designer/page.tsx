@@ -1152,8 +1152,12 @@ export default function CoverDesignerPage() {
         const img = await ImageClass.fromURL(dataUrl, { crossOrigin: 'anonymous' });
         const cw = canvas.width as number;
         const ch = canvas.height as number;
-        const scale = Math.min(cw / (img.width ?? 1), ch / (img.height ?? 1));
-        img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale });
+        const iw = img.width ?? 1;
+        const ih = img.height ?? 1;
+        const scale = Math.min(cw / iw, ch / ih);
+        const cx = (cw - iw * scale) / 2;
+        const cy = (ch - ih * scale) / 2;
+        img.set({ left: cx, top: cy, scaleX: scale, scaleY: scale });
         canvas.add(img);
         canvas.sendObjectToBack ? canvas.sendObjectToBack(img) : canvas.sendToBack(img);
         canvas.renderAll();

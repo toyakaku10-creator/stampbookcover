@@ -1044,9 +1044,11 @@ export default function MapEditor() {
         const nw = (img.width  as number) || cw;
         const nh = (img.height as number) || ch;
         const scale = Math.min(cw / nw, ch / nh);
+        const cx = (cw - nw * scale) / 2;
+        const cy = (ch - nh * scale) / 2;
         const locked = bgLockedRef.current;
         img.set({
-          left: 0, top: 0, scaleX: scale, scaleY: scale,
+          left: cx, top: cy, scaleX: scale, scaleY: scale,
           opacity: bgOpacityRef.current,
           selectable: !locked, evented: !locked, hasControls: !locked,
           lockUniScaling: bgAspectLockRef.current,

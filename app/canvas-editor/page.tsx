@@ -58,13 +58,10 @@ function parseRgba(s: string): { color: string; alpha: number } {
 // ── サイズプリセット (mm) ─────────────────────────────────────
 type CanvasPreset = { name: string; mmW: number; mmH: number };
 const CANVAS_PRESETS: CanvasPreset[] = [
-  { name: 'ブックカバー（応募サイズ）', mmW: 385, mmH: 152 },
-  { name: 'A4 縦',                      mmW: 210, mmH: 297 },
-  { name: 'A4 横',                      mmW: 297, mmH: 210 },
-  { name: 'B5 縦',                      mmW: 182, mmH: 257 },
-  { name: '正方形',                     mmW: 200, mmH: 200 },
+  { name: '応募サイズ', mmW: 385, mmH: 152 },
+  { name: '標準カバー', mmW: 340, mmH: 255 },
 ];
-const DEFAULT_PRESET = CANVAS_PRESETS[0]; // ブックカバーがデフォルト
+const DEFAULT_PRESET = CANVAS_PRESETS[0];
 
 // ── 背景色プリセット ─────────────────────────────────────────
 const BG_COLOR_PRESETS = [
@@ -1169,7 +1166,18 @@ export default function MapEditor() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh',
                   background: 'var(--bg)', color: 'var(--text)' }}>
-      <AppHeader />
+      <AppHeader>
+        <button onClick={() => setShowSizeModal(true)} title="サイズ変更"
+          style={{ background: '#1A3358', border: 'none', borderRadius: 6,
+                   color: 'var(--text)', padding: '4px 10px', cursor: 'pointer',
+                   display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
+                   minWidth: 'fit-content' }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#243F66'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = '#1A3358'; }}>
+          <Maximize2 size={14} />
+          <span style={{ color: '#C9A84C' }}>{canvasMmW}×{canvasMmH}mm</span>
+        </button>
+      </AppHeader>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
@@ -1201,17 +1209,6 @@ export default function MapEditor() {
 
           {/* ════ キャンバス設定 ════ */}
           <div style={S.sectionHead}>キャンバス設定</div>
-
-          {/* サイズ変更ボタン */}
-          <button onClick={() => setShowSizeModal(true)}
-            style={{ ...S.btn(), justifyContent: 'space-between', padding: '6px 10px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Maximize2 size={12} /> サイズ変更
-            </span>
-            <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>
-              {canvasMmW}×{canvasMmH}mm
-            </span>
-          </button>
 
           {/* 背景色 */}
           <div>

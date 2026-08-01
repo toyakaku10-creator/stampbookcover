@@ -10,6 +10,7 @@ import { saveMap, getSavedMaps, getMap } from '@/lib/mapStorage';
 import type { SavedMap } from '@/lib/mapStorage';
 import {
   jitteredBezierPathStr,
+  jitteredBezierClosedPathStr,
   buildRoadObjects,
   buildRailwayObjects,
   buildRiverObjects,
@@ -70,7 +71,9 @@ const DEFAULT_BG = '#F5F0E8';
 
 // ── ツール定義 ────────────────────────────────────────────────
 const DRAWING_TOOLS = ['road', 'railway', 'river', 'greenarea'] as const;
-const MAP_EXTRA_PROPS = ['_mapLineType', '_isBgImage', '_mapStampId'];
+const MAP_EXTRA_PROPS = ['_mapLineType', '_isBgImage', '_mapStampId', '_anchorPoints', '_strokeId'];
+
+type DrawStyle = 'map' | 'sketch';
 
 type MapTool = 'select' | 'road' | 'railway' | 'river' | 'greenarea' | 'stamp';
 
@@ -258,6 +261,19 @@ export default function MapEditor() {
     canvas.renderAll();
   }, [bgAspectLock]);
 
+  // ── 表現スタイル ───────────────────────────────────────────
+  const [drawStyle,   setDrawStyle]   = useState<DrawStyle>('map');
+  const [sketchColor, setSketchColor] = useState('#2A1A0A');
+  const [sketchWidth, setSketchWidth] = useState(1.5);
+
+  const drawStyleRef   = useRef<DrawStyle>('map');
+  const sketchColorRef = useRef('#2A1A0A');
+  const sketchWidthRef = useRef(1.5);
+
+  useEffect(() => { drawStyleRef.current   = drawStyle;   }, [drawStyle]);
+  useEffect(() => { sketchColorRef.current = sketchColor; }, [sketchColor]);
+  useEffect(() => { sketchWidthRef.current = sketchWidth; }, [sketchWidth]);
+
   // ── スタンプ ───────────────────────────────────────────────
   const [stamps,        setStamps]        = useState<Stamp[]>([]);
   const [selectedStamp, setSelectedStamp] = useState<Stamp | null>(null);
@@ -273,10 +289,13 @@ export default function MapEditor() {
     const canvas = fabricRef.current;
     if (!canvas) return;
     const state = {
-      json:    canvas.toJSON(MAP_EXTRA_PROPS),
-      bgColor: bgColorRef.current,
-      mmW:     canvasMmWRef.current,
-      mmH:     canvasMmHRef.current,
+      json:        canvas.toJSON(MAP_EXTRA_PROPS),
+      bgColor:     bgColorRef.current,
+      mmW:         canvasMmWRef.current,
+      mmH:         canvasMmHRef.current,
+      drawStyle:   drawStyleRef.current,
+      sketchColor: sketchColorRef.current,
+      sketchWidth: sketchWidthRef.current,
     };
     historyRef.current = historyRef.current.slice(0, historyIdxRef.current + 1);
     historyRef.current.push(JSON.stringify(state));
@@ -289,7 +308,7 @@ export default function MapEditor() {
     const canvas = fabricRef.current;
     if (!canvas) return;
     try {
-      const { json, bgColor: savedBg, mmW, mmH } =
+      const { json, bgColor: savedBg, mmW, mmH, drawStyle: savedDs, sketchColor: savedSc, sketchWidth: savedSw } =
         JSON.parse(historyRef.current[historyIdxRef.current]);
       if (mmW && mmH) {
         const c = computeCanvas(mmW, mmH);
@@ -322,6 +341,9 @@ export default function MapEditor() {
           setBgScalePct(pct);
           setBgScaleInput(String(pct));
         }
+        if (savedDs) { setDrawStyle(savedDs as DrawStyle); drawStyleRef.current = savedDs as DrawStyle; }
+        if (savedSc) { setSketchColor(savedSc); sketchColorRef.current = savedSc; }
+        if (savedSw != null) { setSketchWidth(savedSw); sketchWidthRef.current = savedSw; }
         canvas.renderAll();
       });
     } catch { /* ignore */ }
@@ -399,30 +421,69 @@ export default function MapEditor() {
     if (enoughPts) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let objs: any[] = [];
-      if (tool === 'road') {
-        objs = buildRoadObjects(fabric, pts, {
-          color: lineColorRef.current, strokeWidth: strokeWidthRef.current,
-          jitter: jitterAmtRef.current, doubleStroke: roadDoubleRef.current,
+
+      if (drawStyleRef.current === 'sketch') {
+        // 線画スタイル: ツール種別によらず均一線幅・塗りなしの単一パス
+        const isClosed = tool === 'greenarea';
+        const pathStr  = isClosed
+          ? jitteredBezierClosedPathStr(pts, jitterAmtRef.current)
+          : jitteredBezierPathStr(pts, jitterAmtRef.current);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const p: any = new fabric.Path(pathStr, {
+          fill: isClosed ? hexToRgba(sketchColorRef.current, 0.04) : 'transparent',
+          stroke: sketchColorRef.current,
+          strokeWidth: sketchWidthRef.current,
+          strokeLineCap: 'round', strokeLineJoin: 'round',
+          strokeUniform: true, selectable: true,
         });
-      } else if (tool === 'railway') {
-        objs = [buildRailwayObjects(fabric, pts, {
-          color: lineColorRef.current, railWidth: 2, jitter: jitterAmtRef.current,
-          railGap: railGapRef.current, sleeperGap: sleeperGapRef.current,
-        })];
-      } else if (tool === 'river') {
-        objs = [buildRiverObjects(fabric, pts, {
-          fillColor: riverFillRef.current, strokeColor: riverStrokeRef.current,
-          width: riverWidthRef.current, jitter: jitterAmtRef.current,
-        })];
-      } else if (tool === 'greenarea') {
-        const g = buildGreenAreaObjects(fabric, pts, {
-          fillColor:   hexToRgba(greenFillRef.current, greenFillOpacityRef.current),
-          strokeColor: greenStrokeRef.current,
-          strokeWidth: greenStrokeWRef.current,
-          jitter:      jitterAmtRef.current,
-        });
-        if (g) objs = [g];
+        p._mapLineType = tool;
+        objs = [p];
+      } else {
+        // マップスタイル: ツール別の描画
+        if (tool === 'road') {
+          const roadObjs = buildRoadObjects(fabric, pts, {
+            color: lineColorRef.current, strokeWidth: strokeWidthRef.current,
+            jitter: jitterAmtRef.current, doubleStroke: roadDoubleRef.current,
+          });
+          // doubleStroke の 2 本線を 1 つの Group にまとめてz-order管理を統一
+          if (roadObjs.length > 1) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const grp: any = new fabric.Group(roadObjs, { selectable: true });
+            grp._mapLineType = 'road';
+            objs = [grp];
+          } else {
+            objs = roadObjs;
+          }
+        } else if (tool === 'railway') {
+          objs = [buildRailwayObjects(fabric, pts, {
+            color: lineColorRef.current, railWidth: 2, jitter: jitterAmtRef.current,
+            railGap: railGapRef.current, sleeperGap: sleeperGapRef.current,
+          })];
+        } else if (tool === 'river') {
+          objs = [buildRiverObjects(fabric, pts, {
+            fillColor: riverFillRef.current, strokeColor: riverStrokeRef.current,
+            width: riverWidthRef.current, jitter: jitterAmtRef.current,
+          })];
+        } else if (tool === 'greenarea') {
+          const g = buildGreenAreaObjects(fabric, pts, {
+            fillColor:   hexToRgba(greenFillRef.current, greenFillOpacityRef.current),
+            strokeColor: greenStrokeRef.current,
+            strokeWidth: greenStrokeWRef.current,
+            jitter:      jitterAmtRef.current,
+          });
+          if (g) objs = [g];
+        }
       }
+
+      // アンカー点とストローク ID を各オブジェクトに付与
+      const strokeId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      objs.forEach(o => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (o as any)._anchorPoints = [...pts];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (o as any)._strokeId    = strokeId;
+      });
+
       objs.forEach(o => canvas.add(o));
       canvas.renderAll();
       saveHistory();
@@ -439,6 +500,100 @@ export default function MapEditor() {
     setAnchorCount(0);
     canvas?.renderAll();
   }, []);
+
+  // ── スタイル切り替え ──────────────────────────────────────
+  const switchStyle = useCallback((newStyle: DrawStyle) => {
+    const canvas = fabricRef.current;
+    const fabric = fabricLibRef.current;
+    if (!canvas || !fabric) return;
+
+    setDrawStyle(newStyle);
+    drawStyleRef.current = newStyle;
+
+    // アンカー点が保存されているオブジェクトを取得
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const canvasObjs = canvas.getObjects() as any[];
+    const strokeObjs = canvasObjs.filter(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (o: any) => o._mapLineType && o._anchorPoints && o._strokeId,
+    );
+    if (strokeObjs.length === 0) { saveHistory(); return; }
+
+    // 内部配列を直接操作して z-order を維持しながら差し替え
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const internalObjs = (canvas as any)._objects as any[];
+
+    strokeObjs.forEach(oldObj => {
+      const idx = internalObjs.indexOf(oldObj);
+      if (idx === -1) return;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pts: Point[]  = (oldObj as any)._anchorPoints;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const lineType: string = (oldObj as any)._mapLineType;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sid: string   = (oldObj as any)._strokeId;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let newObj: any;
+
+      if (newStyle === 'sketch') {
+        const isClosed = lineType === 'greenarea';
+        const pathStr  = isClosed
+          ? jitteredBezierClosedPathStr(pts, jitterAmtRef.current)
+          : jitteredBezierPathStr(pts, jitterAmtRef.current);
+        newObj = new fabric.Path(pathStr, {
+          fill: isClosed ? hexToRgba(sketchColorRef.current, 0.04) : 'transparent',
+          stroke: sketchColorRef.current,
+          strokeWidth: sketchWidthRef.current,
+          strokeLineCap: 'round', strokeLineJoin: 'round',
+          strokeUniform: true, selectable: true,
+        });
+        newObj._mapLineType = lineType;
+      } else {
+        // map スタイルで再構築
+        if (lineType === 'road') {
+          const roadObjs = buildRoadObjects(fabric, pts, {
+            color: lineColorRef.current, strokeWidth: strokeWidthRef.current,
+            jitter: jitterAmtRef.current, doubleStroke: roadDoubleRef.current,
+          });
+          if (roadObjs.length > 1) {
+            newObj = new fabric.Group(roadObjs, { selectable: true });
+            newObj._mapLineType = 'road';
+          } else {
+            newObj = roadObjs[0];
+          }
+        } else if (lineType === 'railway') {
+          newObj = buildRailwayObjects(fabric, pts, {
+            color: lineColorRef.current, railWidth: 2, jitter: jitterAmtRef.current,
+            railGap: railGapRef.current, sleeperGap: sleeperGapRef.current,
+          });
+        } else if (lineType === 'river') {
+          newObj = buildRiverObjects(fabric, pts, {
+            fillColor: riverFillRef.current, strokeColor: riverStrokeRef.current,
+            width: riverWidthRef.current, jitter: jitterAmtRef.current,
+          });
+        } else if (lineType === 'greenarea') {
+          newObj = buildGreenAreaObjects(fabric, pts, {
+            fillColor: hexToRgba(greenFillRef.current, greenFillOpacityRef.current),
+            strokeColor: greenStrokeRef.current, strokeWidth: greenStrokeWRef.current,
+            jitter: jitterAmtRef.current,
+          }) ?? oldObj;
+        } else {
+          return; // 不明なタイプは変更しない
+        }
+      }
+
+      newObj._anchorPoints = pts;
+      newObj._strokeId    = sid;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (newObj as any).canvas = canvas;
+      internalObjs.splice(idx, 1, newObj);
+    });
+
+    canvas.renderAll();
+    saveHistory();
+  }, [saveHistory]);
 
   // ── キャンバスサイズ変更 ───────────────────────────────────
   const applyCanvasSize = useCallback((mmW: number, mmH: number) => {
@@ -574,8 +729,12 @@ export default function MapEditor() {
             canvasMmWRef.current = saved.mmW; canvasMmHRef.current = saved.mmH;
             setCanvasMmW(saved.mmW); setCanvasMmH(saved.mmH); setPxInfo(c);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             bgImageObjRef.current = canvas.getObjects().find((o: any) => o._isBgImage) ?? null;
             setHasBgImage(!!bgImageObjRef.current);
+            if (saved.drawStyle) { setDrawStyle(saved.drawStyle); drawStyleRef.current = saved.drawStyle; }
+            if (saved.sketchColor) { setSketchColor(saved.sketchColor); sketchColorRef.current = saved.sketchColor; }
+            if (saved.sketchWidth != null) { setSketchWidth(saved.sketchWidth); sketchWidthRef.current = saved.sketchWidth; }
             canvas.renderAll();
           });
           return; // skip normal initial history save
@@ -711,7 +870,10 @@ export default function MapEditor() {
       name: name || 'マップ背景',
       thumbnail,
       fabricJson,
-      bgColor: bgColorRef.current,
+      bgColor:     bgColorRef.current,
+      drawStyle:   drawStyleRef.current,
+      sketchColor: sketchColorRef.current,
+      sketchWidth: sketchWidthRef.current,
       mmW: canvasMmWRef.current,
       mmH: canvasMmHRef.current,
       createdAt: Date.now(),
@@ -799,6 +961,41 @@ export default function MapEditor() {
 
         {/* ── 右パネル ─────────────────────────────────────── */}
         <div style={{ ...S.panel, background: 'var(--surface)', borderLeft: '1px solid var(--border)' }}>
+
+          {/* ════ 表現スタイル ════ */}
+          <div style={S.sectionHead}>表現スタイル</div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {([
+              { id: 'map',    label: 'マップ',  sub: '地図向け' },
+              { id: 'sketch', label: '線画',    sub: 'カバー向け' },
+            ] as { id: DrawStyle; label: string; sub: string }[]).map(s => (
+              <button key={s.id} onClick={() => switchStyle(s.id)}
+                style={{ flex: 1, padding: '5px 4px', fontSize: 10, borderRadius: 5, border: 'none',
+                          cursor: 'pointer', textAlign: 'center', lineHeight: 1.4,
+                          background: drawStyle === s.id ? 'var(--accent)' : 'var(--bg)',
+                          color:      drawStyle === s.id ? '#0F2340'       : 'var(--text)' }}>
+                <span style={{ fontWeight: 700, display: 'block' }}>{s.label}</span>
+                <span style={{ fontSize: 9, opacity: 0.75 }}>{s.sub}</span>
+              </button>
+            ))}
+          </div>
+          {drawStyle === 'sketch' && (
+            <>
+              <div>
+                <div style={S.lbl}>線の色</div>
+                <input type="color" value={sketchColor} onChange={e => setSketchColor(e.target.value)}
+                  style={{ width: '100%', height: 26, borderRadius: 5 }} />
+              </div>
+              <div>
+                <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>線の太さ</span><span style={{ color: 'var(--accent)' }}>{sketchWidth}px</span>
+                </div>
+                <input type="range" min={0.5} max={6} step={0.5} value={sketchWidth}
+                  onChange={e => setSketchWidth(Number(e.target.value))} style={{ width: '100%' }} />
+              </div>
+            </>
+          )}
+          <div style={S.divider} />
 
           {/* ════ キャンバス設定 ════ */}
           <div style={S.sectionHead}>キャンバス設定</div>

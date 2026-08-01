@@ -38,6 +38,12 @@ export default function AppTabs({ onBeforeNavigate }: { onBeforeNavigate?: () =>
       >
         カバーデザイナー
       </button>
+      <button
+        style={TAB_STYLE(pathname === '/map-editor')}
+        onClick={() => navigate('/map-editor')}
+      >
+        マップエディター
+      </button>
     </div>
   );
 }

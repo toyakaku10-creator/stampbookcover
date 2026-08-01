@@ -641,7 +641,7 @@ export default function CoverDesignerPage() {
               const cw = canvas.width as number;
               const ch = canvas.height as number;
               const scale = Math.min(cw / (img.width ?? 1), ch / (img.height ?? 1));
-              img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale, selectable: false, evented: false });
+              img.set({ left: 0, top: 0, originX: 'left', originY: 'top', scaleX: scale, scaleY: scale, selectable: false, evented: false });
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (img as any)._isMapBg = true;
               canvas.add(img);
@@ -673,7 +673,7 @@ export default function CoverDesignerPage() {
             const cw = canvas.width as number;
             const ch = canvas.height as number;
             const scale = Math.min(cw / (img.width ?? 1), ch / (img.height ?? 1));
-            img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale, selectable: false, evented: false });
+            img.set({ left: 0, top: 0, originX: 'left', originY: 'top', scaleX: scale, scaleY: scale, selectable: false, evented: false });
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (img as any)._isMapBg = true;
             canvas.add(img);
@@ -970,7 +970,7 @@ export default function CoverDesignerPage() {
     const cw = canvas.width as number;
     const ch = canvas.height as number;
     const scale = Math.min(cw / (img.width ?? 1), ch / (img.height ?? 1));
-    img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale, selectable: false, evented: false });
+    img.set({ left: 0, top: 0, originX: 'left', originY: 'top', scaleX: scale, scaleY: scale, selectable: false, evented: false });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (img as any)._isMapBg = true;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

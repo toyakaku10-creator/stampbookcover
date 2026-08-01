@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { MousePointer2, Undo2, Trash2, Download, Upload } from 'lucide-react';
 import { getStamps } from '@/lib/stampStorage';
 import type { Stamp } from '@/lib/types';
 import AppHeader from '@/components/AppHeader';
+import { saveMap, getSavedMaps, getMap } from '@/lib/mapStorage';
+import type { SavedMap } from '@/lib/mapStorage';
 import {
   jitteredBezierPathStr,
   buildRoadObjects,
@@ -117,9 +120,15 @@ const StampIcon     = () => <svg viewBox="0 0 20 20" width={18} height={18} fill
 const INIT = computeCanvas(DEFAULT_PRESET.mmW, DEFAULT_PRESET.mmH);
 
 export default function MapEditor() {
+  const router = useRouter();
   const canvasRef    = useRef<HTMLCanvasElement>(null);
   const fabricRef    = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const fabricLibRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+  // ── カバーデザイナー連携 ───────────────────────────────────
+  const [editingMapId, setEditingMapId] = useState('');
+  const [showSavePanel, setShowSavePanel] = useState(false);
+  const [saveName, setSaveName] = useState('');
 
   // ── ツール ─────────────────────────────────────────────────
   const [mapTool, setMapTool] = useState<MapTool>('select');
@@ -497,15 +506,6 @@ export default function MapEditor() {
       });
       fabricRef.current = canvas;
 
-      const initial = {
-        json:    canvas.toJSON(MAP_EXTRA_PROPS),
-        bgColor: bgColorRef.current,
-        mmW:     canvasMmWRef.current,
-        mmH:     canvasMmHRef.current,
-      };
-      historyRef.current    = [JSON.stringify(initial)];
-      historyIdxRef.current = 0;
-
       // mouse:up: アンカー追加 or スタンプ配置
       canvas.on('mouse:up', (opt: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         const tool = mapToolRef.current;
@@ -554,6 +554,42 @@ export default function MapEditor() {
           setBgScaleInput(String(pct));
         }
       });
+
+      // ?edit=<id> URL param: load saved map
+      const editId = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('edit')
+        : null;
+      if (editId) {
+        const saved = getMap(editId);
+        if (saved) {
+          setEditingMapId(editId);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (canvas.loadFromJSON(saved.fabricJson) as any).then(() => {
+            canvas.backgroundColor = saved.bgColor;
+            setBgColor(saved.bgColor);
+            const c = computeCanvas(saved.mmW, saved.mmH);
+            canvas.setDimensions({ width: c.pxW, height: c.pxH });
+            canvasPxWRef.current = c.pxW; canvasPxHRef.current = c.pxH;
+            exportMultRef.current = c.mult;
+            canvasMmWRef.current = saved.mmW; canvasMmHRef.current = saved.mmH;
+            setCanvasMmW(saved.mmW); setCanvasMmH(saved.mmH); setPxInfo(c);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            bgImageObjRef.current = canvas.getObjects().find((o: any) => o._isBgImage) ?? null;
+            setHasBgImage(!!bgImageObjRef.current);
+            canvas.renderAll();
+          });
+          return; // skip normal initial history save
+        }
+      }
+      // normal initial history
+      const initial = {
+        json:    canvas.toJSON(MAP_EXTRA_PROPS),
+        bgColor: bgColorRef.current,
+        mmW:     canvasMmWRef.current,
+        mmH:     canvasMmHRef.current,
+      };
+      historyRef.current    = [JSON.stringify(initial)];
+      historyIdxRef.current = 0;
     });
 
     return () => {
@@ -661,6 +697,38 @@ export default function MapEditor() {
     canvas.renderAll();
     saveHistory();
   }, [saveHistory]);
+
+  // ── カバーデザイナー連携 ───────────────────────────────────
+  const doSaveMap = useCallback((name: string) => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const thumbnail = canvas.toDataURL({ format: 'jpeg', quality: 0.7, multiplier: 0.2 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabricJson = canvas.toJSON(MAP_EXTRA_PROPS) as any;
+    const id = editingMapId || Date.now().toString();
+    const map: SavedMap = {
+      id,
+      name: name || 'マップ背景',
+      thumbnail,
+      fabricJson,
+      bgColor: bgColorRef.current,
+      mmW: canvasMmWRef.current,
+      mmH: canvasMmHRef.current,
+      createdAt: Date.now(),
+    };
+    saveMap(map);
+    setEditingMapId(id);
+    setShowSavePanel(false);
+  }, [editingMapId]);
+
+  const applyToDesigner = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const pngDataUrl = canvas.toDataURL({ format: 'png', multiplier: exportMultRef.current });
+    sessionStorage.setItem('mapApplyPng', pngDataUrl);
+    sessionStorage.setItem('mapApplyMeta', JSON.stringify({ mmW: canvasMmWRef.current, mmH: canvasMmHRef.current }));
+    router.push('/cover-designer');
+  }, [router]);
 
   // ── PNG 書き出し（300 DPI 相当）────────────────────────────
   const exportPng = useCallback(() => {
@@ -1054,6 +1122,43 @@ export default function MapEditor() {
               </button>
             </>
           )}
+
+          {/* ════ カバーデザイナー連携 ════ */}
+          <div style={S.divider} />
+          <div style={S.sectionHead}>カバーデザイナー連携</div>
+
+          {/* Save panel toggle */}
+          {!showSavePanel ? (
+            <button onClick={() => { setSaveName(editingMapId ? (getSavedMaps().find((m: SavedMap) => m.id === editingMapId)?.name ?? '') : ''); setShowSavePanel(true); }} style={S.btn()}>
+              💾 背景として保存...
+            </button>
+          ) : (
+            <div>
+              <div style={S.lbl}>{editingMapId ? '上書き保存' : '名前を入力'}</div>
+              <input
+                autoFocus
+                value={saveName}
+                onChange={e => setSaveName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && doSaveMap(saveName)}
+                placeholder="マップ背景"
+                style={{ ...S.input, width: '100%', marginBottom: 4 }}
+              />
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button onClick={() => doSaveMap(saveName)} style={{ ...S.btn('accent'), flex: 1 }}>保存</button>
+                <button onClick={() => setShowSavePanel(false)} style={{ ...S.btn(), flex: 1 }}>キャンセル</button>
+              </div>
+            </div>
+          )}
+
+          {editingMapId && (
+            <div style={{ fontSize: 10, color: 'var(--accent)', textAlign: 'center' }}>
+              保存済み ✓
+            </div>
+          )}
+
+          <button onClick={applyToDesigner} style={S.btn('accent')}>
+            カバーデザイナーに適用 →
+          </button>
 
           {/* ════ 書き出し ════ */}
           <div style={S.divider} />

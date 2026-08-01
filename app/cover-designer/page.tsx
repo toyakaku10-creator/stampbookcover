@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/AppHeader';
+import { getSavedMaps, deleteMap } from '@/lib/mapStorage';
+import type { SavedMap } from '@/lib/mapStorage';
 import {
   Grid, Shuffle, Frame,
   Trash2, Copy, Download, Upload, ImageIcon, Minus, Plus,
@@ -153,10 +156,14 @@ function NumberStepper({ label, value, onChange, min, max, step = 1 }: {
 }
 
 export default function CoverDesignerPage() {
+  const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fabricRef = useRef<any>(null);
   const [stamps, setStamps] = useState<StampType[]>([]);
+  const [savedMaps, setSavedMaps] = useState<SavedMap[]>([]);
+  const [activeMapId, setActiveMapId] = useState('');
+  const [isRenderingMap, setIsRenderingMap] = useState(false);
   const [arrangement, setArrangement] = useState<ArrangementType>('grid');
   const [arrangementCount, setArrangementCount] = useState(9);
   const [bgColor, setBgColor] = useState(() =>
@@ -289,6 +296,7 @@ export default function CoverDesignerPage() {
   };
 
   useEffect(() => { setStamps(getStamps()); }, []);
+  useEffect(() => { setSavedMaps(getSavedMaps()); }, []);
   useEffect(() => { stampsRef.current = stamps; }, [stamps]);
   useEffect(() => { stampSizeRef.current = stampSize; }, [stampSize]);
   useEffect(() => { isStampRef.current = isStamp; }, [isStamp]);
@@ -305,13 +313,13 @@ export default function CoverDesignerPage() {
     if (isBatchingRef.current || !fabricRef.current) return;
     const canvas = fabricRef.current;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const json: any = canvas.toJSON(['isOverlay', 'data']);
+    const json: any = canvas.toJSON(['isOverlay', 'data', '_isMapBg', '_mapId']);
     json.backgroundColor = undefined;
     // isOverlay フラグを持つオーバーレイ（エリア選択枠）を履歴から除外
     // per-object serialization で data を確実に含める
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     json.objects = (canvas.getObjects() as any[])
-      .map((o: any) => o.toObject(['isOverlay', 'data']))
+      .map((o: any) => o.toObject(['isOverlay', 'data', '_isMapBg', '_mapId']))
       .filter((o: any) => !o.isOverlay);
     historyRef.current = historyRef.current.slice(0, historyIndexRef.current + 1);
     historyRef.current.push(JSON.stringify(json));
@@ -621,12 +629,67 @@ export default function CoverDesignerPage() {
           migrateOldMsegShapesRef.current();
           saveHistoryRef.current();
           setTimeout(() => canvas.renderAll(), 50);
+          // sessionStorage から直接適用フロー
+          const mapPng = sessionStorage.getItem('mapApplyPng');
+          if (mapPng) {
+            sessionStorage.removeItem('mapApplyPng');
+            sessionStorage.removeItem('mapApplyMeta');
+            const ImageClass = fabric.FabricImage ?? fabric.Image;
+            setTimeout(async () => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const toRemove = (canvas.getObjects() as any[]).filter((o: any) => o._isMapBg);
+              toRemove.forEach((o: any) => canvas.remove(o)); // eslint-disable-line @typescript-eslint/no-explicit-any
+              const img = await ImageClass.fromURL(mapPng, { crossOrigin: 'anonymous' });
+              const cw = canvas.width as number;
+              const ch = canvas.height as number;
+              const scale = Math.min(cw / (img.width ?? 1), ch / (img.height ?? 1));
+              img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale, selectable: false, evented: false });
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (img as any)._isMapBg = true;
+              canvas.add(img);
+              canvas.sendObjectToBack ? canvas.sendObjectToBack(img) : (canvas as any).sendToBack(img); // eslint-disable-line @typescript-eslint/no-explicit-any
+              canvas.renderAll();
+              setActiveMapId('');
+              saveHistoryRef.current();
+            }, 200);
+          }
+          // Sync active map id
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const bgObj = (canvas.getObjects() as any[]).find((o: any) => o._isMapBg);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (bgObj) setActiveMapId((bgObj as any)._mapId ?? '');
         });
       } else {
         canvas.backgroundColor = savedBg;
         canvas.renderAll();
         isBatchingRef.current = false;
         saveHistoryRef.current();
+        // sessionStorage から直接適用フロー
+        const mapPng = sessionStorage.getItem('mapApplyPng');
+        if (mapPng) {
+          sessionStorage.removeItem('mapApplyPng');
+          sessionStorage.removeItem('mapApplyMeta');
+          const ImageClass = fabric.FabricImage ?? fabric.Image;
+          setTimeout(async () => {
+            const img = await ImageClass.fromURL(mapPng, { crossOrigin: 'anonymous' });
+            const cw = canvas.width as number;
+            const ch = canvas.height as number;
+            const scale = Math.min(cw / (img.width ?? 1), ch / (img.height ?? 1));
+            img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale, selectable: false, evented: false });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (img as any)._isMapBg = true;
+            canvas.add(img);
+            canvas.sendObjectToBack ? canvas.sendObjectToBack(img) : (canvas as any).sendToBack(img); // eslint-disable-line @typescript-eslint/no-explicit-any
+            canvas.renderAll();
+            setActiveMapId('');
+            saveHistoryRef.current();
+          }, 200);
+        }
+        // Sync active map id
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const bgObj = (canvas.getObjects() as any[]).find((o: any) => o._isMapBg);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (bgObj) setActiveMapId((bgObj as any)._mapId ?? '');
       }
 
       // ヒストリー
@@ -868,9 +931,9 @@ export default function CoverDesignerPage() {
       disposed = true;
       if (canvas) {
         try {
-          const baseJson: any = canvas.toJSON(['isOverlay', 'data']);
+          const baseJson: any = canvas.toJSON(['isOverlay', 'data', '_isMapBg', '_mapId']);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          baseJson.objects = (canvas.getObjects() as any[]).map((o: any) => o.toObject(['isOverlay', 'data']));
+          baseJson.objects = (canvas.getObjects() as any[]).map((o: any) => o.toObject(['isOverlay', 'data', '_isMapBg', '_mapId']));
           const json = JSON.stringify(baseJson);
           localStorage.setItem('coverdesigner-canvas-state', json);
           localStorage.setItem('coverdesigner-canvas-bg', bgColorRef.current);
@@ -891,6 +954,69 @@ export default function CoverDesignerPage() {
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
+
+  const applyMapBg = useCallback(async (pngDataUrl: string, mapId?: string) => {
+    const canvas = fabricRef.current;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric = (canvas as any)?._fabric;
+    if (!canvas || !fabric) return;
+    const ImageClass = fabric.FabricImage ?? fabric.Image;
+    // Remove existing map bg objects
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const toRemove = (canvas.getObjects() as any[]).filter((o: any) => o._isMapBg);
+    isBatchingRef.current = true;
+    toRemove.forEach((o: any) => canvas.remove(o)); // eslint-disable-line @typescript-eslint/no-explicit-any
+    isBatchingRef.current = false;
+    // Add new
+    const img = await ImageClass.fromURL(pngDataUrl, { crossOrigin: 'anonymous' });
+    const cw = canvas.width as number;
+    const ch = canvas.height as number;
+    const scale = Math.min(cw / (img.width ?? 1), ch / (img.height ?? 1));
+    img.set({ left: 0, top: 0, scaleX: scale, scaleY: scale, selectable: false, evented: false });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (img as any)._isMapBg = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (mapId) (img as any)._mapId = mapId;
+    canvas.add(img);
+    canvas.sendObjectToBack ? canvas.sendObjectToBack(img) : (canvas as any).sendToBack(img); // eslint-disable-line @typescript-eslint/no-explicit-any
+    canvas.renderAll();
+    setActiveMapId(mapId ?? '');
+    saveHistoryRef.current();
+  }, []);
+
+  const applyMapFromLibrary = useCallback(async (map: SavedMap) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fabric = (fabricRef.current as any)?._fabric;
+    if (!fabric) return;
+    setIsRenderingMap(true);
+    try {
+      // Render the saved Fabric JSON to a high-res PNG using a temporary canvas
+      const DISPLAY_DPI = 72, PRINT_DPI = 300, MAX_PX_W = 820, MAX_PX_H = 560;
+      const rawW = (map.mmW * DISPLAY_DPI) / 25.4;
+      const rawH = (map.mmH * DISPLAY_DPI) / 25.4;
+      const fit = Math.min(MAX_PX_W / rawW, MAX_PX_H / rawH, 1.0);
+      const pxW = Math.round(rawW * fit);
+      const pxH = Math.round(rawH * fit);
+      const mult = (PRINT_DPI / DISPLAY_DPI) / fit;
+
+      const tempEl = document.createElement('canvas');
+      tempEl.style.cssText = 'position:fixed;left:-9999px;top:-9999px;visibility:hidden';
+      document.body.appendChild(tempEl);
+      const tempCanvas = new fabric.Canvas(tempEl, { width: pxW, height: pxH });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (tempCanvas.loadFromJSON(map.fabricJson) as any);
+      tempCanvas.backgroundColor = map.bgColor || '#ffffff';
+      tempCanvas.renderAll();
+      const pngDataUrl = tempCanvas.toDataURL({ format: 'png', multiplier: mult });
+      tempCanvas.dispose();
+      tempEl.remove();
+
+      await applyMapBg(pngDataUrl, map.id);
+    } finally {
+      setIsRenderingMap(false);
+    }
+  }, [applyMapBg]);
 
   const applyBackground = useCallback(() => {
     if (!fabricRef.current) return;
@@ -2159,6 +2285,80 @@ export default function CoverDesignerPage() {
             <div style={{ ...S.label, marginBottom: 4 }}>背景色</div>
             <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)}
               style={{ width: '100%', height: 32, borderRadius: 6 }} />
+          </div>
+
+          {/* マップ背景セクション */}
+          <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ ...S.label, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>マップ背景</span>
+              <button
+                onClick={() => { setSavedMaps(getSavedMaps()); }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: 10 }}
+                title="更新">↻</button>
+            </div>
+
+            {/* マップエディタを開く */}
+            <button
+              onClick={() => router.push('/map-editor')}
+              style={{ ...S.btn(), width: '100%', marginBottom: 6, fontSize: 11 }}>
+              マップエディタを開く →
+            </button>
+
+            {/* Active map info */}
+            {activeMapId && (
+              <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6, textAlign: 'center' }}>
+                ✓ {savedMaps.find(m => m.id === activeMapId)?.name ?? 'マップ背景'}
+                {' '}
+                <button
+                  onClick={() => router.push(`/map-editor?edit=${activeMapId}`)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 10, textDecoration: 'underline' }}>
+                  編集
+                </button>
+              </div>
+            )}
+
+            {/* Saved maps list */}
+            {savedMaps.length === 0 ? (
+              <div style={{ fontSize: 11, color: '#555', textAlign: 'center', padding: '8px 0' }}>
+                マップエディタで背景を保存してください
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {savedMaps.map(map => (
+                  <div key={map.id} style={{
+                    border: `1px solid ${activeMapId === map.id ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: 6, padding: '5px 6px',
+                    background: activeMapId === map.id ? 'rgba(201,168,76,0.08)' : 'var(--bg)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={map.thumbnail} alt={map.name}
+                        style={{ width: 36, height: 18, objectFit: 'cover', borderRadius: 2, flexShrink: 0, border: '1px solid var(--border)' }} />
+                      <span style={{ fontSize: 11, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {map.name}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 3 }}>
+                      <button
+                        onClick={() => applyMapFromLibrary(map)}
+                        disabled={isRenderingMap}
+                        style={{ ...S.btn(activeMapId === map.id), flex: 1, fontSize: 10, padding: '3px 0' }}>
+                        {isRenderingMap && activeMapId !== map.id ? '...' : '適用'}
+                      </button>
+                      <button
+                        onClick={() => router.push(`/map-editor?edit=${map.id}`)}
+                        style={{ ...S.btn(), flex: 1, fontSize: 10, padding: '3px 0' }}>
+                        編集
+                      </button>
+                      <button
+                        onClick={() => { deleteMap(map.id); setSavedMaps(getSavedMaps()); if (activeMapId === map.id) setActiveMapId(''); }}
+                        style={{ ...S.btn(false, true), width: 24, minWidth: 24, padding: 0, fontSize: 10 }}
+                        title="削除">✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* 2. スタンプ（タブ切り替え） */}

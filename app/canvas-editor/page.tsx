@@ -164,8 +164,8 @@ export default function MapEditor() {
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [jitterAmt,   setJitterAmt]   = useState(3);
   const [roadDouble,  setRoadDouble]  = useState(false);
-  const [railGap,     setRailGap]     = useState(10);
-  const [sleeperGap,  setSleeperGap]  = useState(14);
+  const [railGap,     setRailGap]     = useState(8);
+  const [sleeperGap,  setSleeperGap]  = useState(10);
   const [riverColor,  setRiverColor]  = useState('#7D97A3');
   const [riverWidth,  setRiverWidth]  = useState(2);
 
@@ -173,8 +173,8 @@ export default function MapEditor() {
   const strokeWidthRef = useRef(2);
   const jitterAmtRef   = useRef(3);
   const roadDoubleRef  = useRef(false);
-  const railGapRef     = useRef(10);
-  const sleeperGapRef  = useRef(14);
+  const railGapRef     = useRef(8);
+  const sleeperGapRef  = useRef(10);
   const riverColorRef  = useRef('#7D97A3');
   const riverWidthRef  = useRef(2);
 
@@ -188,14 +188,14 @@ export default function MapEditor() {
   useEffect(() => { riverWidthRef.current  = riverWidth;  }, [riverWidth]);
 
   // ── 橋プロパティ ───────────────────────────────────────────
-  const [bridgeColor,    setBridgeColor]    = useState('#888888');
-  const [bridgeHatchLen, setBridgeHatchLen] = useState(12);
-  const [bridgeHatchGap, setBridgeHatchGap] = useState(8);
+  const [bridgeColor,    setBridgeColor]    = useState('#4A3E2E');
+  const [bridgeHatchLen, setBridgeHatchLen] = useState(14);
+  const [bridgeHatchGap, setBridgeHatchGap] = useState(10);
   const [bridgeStrokeW,  setBridgeStrokeW]  = useState(1.5);
 
-  const bridgeColorRef    = useRef('#888888');
-  const bridgeHatchLenRef = useRef(12);
-  const bridgeHatchGapRef = useRef(8);
+  const bridgeColorRef    = useRef('#4A3E2E');
+  const bridgeHatchLenRef = useRef(14);
+  const bridgeHatchGapRef = useRef(10);
   const bridgeStrokeWRef  = useRef(1.5);
 
   useEffect(() => { bridgeColorRef.current    = bridgeColor;    }, [bridgeColor]);
@@ -523,7 +523,7 @@ export default function MapEditor() {
         }
       } else if (tool === 'railway') {
         objs = [buildRailwayObjects(fabric, pts, {
-          color: lineColorRef.current, railWidth: 2, jitter: jitterAmtRef.current,
+          color: lineColorRef.current, railWidth: 1.5, jitter: jitterAmtRef.current,
           railGap: railGapRef.current, sleeperGap: sleeperGapRef.current,
         })];
       } else if (tool === 'river') {
@@ -744,7 +744,7 @@ export default function MapEditor() {
         if (roadObjs.length > 1) { newObj = new fabric.Group(roadObjs, { selectable: true }); newObj._mapLineType = 'road'; }
         else newObj = roadObjs[0];
       } else if (lt === 'railway') {
-        newObj = buildRailwayObjects(fabric, pts, { color: opts.color || lineColorRef.current, railWidth: 2, jitter, railGap: opts.railGap || railGapRef.current, sleeperGap: opts.sleeperGap || sleeperGapRef.current });
+        newObj = buildRailwayObjects(fabric, pts, { color: opts.color || lineColorRef.current, railWidth: 1.5, jitter, railGap: opts.railGap || railGapRef.current, sleeperGap: opts.sleeperGap || sleeperGapRef.current });
       } else if (lt === 'river') {
         newObj = buildRiverObjects(fabric, pts, { color: opts.color || riverColorRef.current, strokeWidth: opts.strokeWidth || riverWidthRef.current, jitter });
       } else if (lt === 'greenarea') {
@@ -1150,6 +1150,7 @@ export default function MapEditor() {
     setMapTool(t);
     if (t === 'road')    { setLineColor('#999999'); setStrokeWidth(2); }
     if (t === 'railway') { setLineColor('#4A3E2E'); }
+    if (t === 'bridge')  { setBridgeColor('#4A3E2E'); }
     if (t === 'river')   { setRiverColor('#7D97A3'); setRiverWidth(2); }
   }, [cancelDrawing]);
 

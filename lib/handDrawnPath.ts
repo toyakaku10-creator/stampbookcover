@@ -236,9 +236,9 @@ export function buildRiverObjects(
 // ── 橋 ───────────────────────────────────────────────────────
 export type BridgeOpts = {
   color: string;
-  hatchLength: number; // ハッチ線の長さ (px)
-  hatchGap: number;    // ハッチ間隔 (px)
-  strokeWidth: number; // ハッチ線の太さ (px)
+  hatchLength: number; // 橋の幅 (px) ─ 2本の側壁間距離
+  hatchGap: number;    // 床板ハッチングの間隔 (px)
+  strokeWidth: number; // 側壁・床板の線幅 (px)
 };
 
 export function buildBridgeObjects(
@@ -247,28 +247,65 @@ export function buildBridgeObjects(
   opts: BridgeOpts,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any | null {
+  if (points.length < 2) return null;
   const { color, hatchLength, hatchGap, strokeWidth } = opts;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hatches: any[] = [];
 
-  // Bezierスプライン上の等アーク長位置にサンプリング（線路枕木と同じ方式）
+  const hw  = hatchLength / 2;    // 中心線から各側壁までの距離
+  const ext = hw * 0.4;           // 取り付け部の側壁からのはみ出し量
+
+  const wallPathOpts = {
+    fill: 'transparent', stroke: color, strokeWidth,
+    strokeLineCap: 'round' as const, strokeLineJoin: 'round' as const,
+    strokeUniform: true, selectable: false, evented: false,
+  };
+
+  // 1. 橋の側壁（2本の平行線）── jitter=0 で正確な平行を保つ
+  const wall1 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points, -hw), 0), wallPathOpts);
+  const wall2 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points,  hw), 0), wallPathOpts);
+
+  // 2. 床板ハッチング（2本の側壁の間に垂直線を等間隔に配置）
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const deck: any[] = [];
   for (const { pos, tangent } of sampleSplineForSleepers(points, hatchGap)) {
-    // 接線と法線の中間方向（45°斜め）でハッチを引く
-    // これにより線路の枕木（垂直）と視覚的に区別できる斜線パターンになる
-    // 方向: (tangent + normal) / √2 = (tx - ty, ty + tx) / √2
-    const dx = (tangent.x - tangent.y) / Math.SQRT2;
-    const dy = (tangent.y + tangent.x) / Math.SQRT2;
+    const nx = -tangent.y, ny = tangent.x; // 接線に垂直な法線
     const h = new fabric.Line(
-      [pos.x - dx * hatchLength / 2, pos.y - dy * hatchLength / 2,
-       pos.x + dx * hatchLength / 2, pos.y + dy * hatchLength / 2],
-      { stroke: color, strokeWidth, strokeUniform: true, selectable: false, evented: false },
+      [pos.x - nx * hw, pos.y - ny * hw,
+       pos.x + nx * hw, pos.y + ny * hw],
+      { stroke: color, strokeWidth: strokeWidth * 0.7, strokeUniform: true,
+        selectable: false, evented: false },
     );
-    hatches.push(h);
+    deck.push(h);
   }
 
-  if (hatches.length === 0) return null;
+  // 3. 橋の取り付け部（両端の太い垂直線 ─ 岸への接続を表現）
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const group: any = new fabric.Group(hatches, { selectable: true });
+  const makeAbutment = (pt: Point, tx: number, ty: number): any => {
+    const nx = -ty, ny = tx;
+    const halfLen = hw + ext;
+    return new fabric.Line(
+      [pt.x - nx * halfLen, pt.y - ny * halfLen,
+       pt.x + nx * halfLen, pt.y + ny * halfLen],
+      { stroke: color, strokeWidth: strokeWidth * 2, strokeUniform: true,
+        selectable: false, evented: false },
+    );
+  };
+
+  // 始点の接線方向（最初のセグメントから計算）
+  const s0dx = points[1].x - points[0].x, s0dy = points[1].y - points[0].y;
+  const s0l  = Math.sqrt(s0dx * s0dx + s0dy * s0dy) || 1;
+  const startAbutment = makeAbutment(points[0], s0dx / s0l, s0dy / s0l);
+
+  // 終点の接線方向（最後のセグメントから計算）
+  const n = points.length;
+  const s1dx = points[n - 1].x - points[n - 2].x, s1dy = points[n - 1].y - points[n - 2].y;
+  const s1l  = Math.sqrt(s1dx * s1dx + s1dy * s1dy) || 1;
+  const endAbutment = makeAbutment(points[n - 1], s1dx / s1l, s1dy / s1l);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const group: any = new fabric.Group(
+    [wall1, wall2, ...deck, startAbutment, endAbutment],
+    { selectable: true },
+  );
   group._mapLineType = 'bridge';
   return group;
 }

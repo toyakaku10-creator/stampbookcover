@@ -164,7 +164,7 @@ export function buildRailwayObjects(
   opts: RailwayOpts,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any {
-  const { color, railWidth, jitter, railGap, sleeperGap } = opts;
+  const { color, railWidth, railGap, sleeperGap } = opts;
   const railOpts = {
     fill: 'transparent',
     stroke: color,
@@ -176,15 +176,17 @@ export function buildRailwayObjects(
     evented: false,
   };
 
-  const hw    = railGap / 2;
-  const rail1 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points, -hw), jitter), railOpts);
-  const rail2 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points,  hw), jitter), railOpts);
+  const hw = railGap / 2;
+  // jitter=0 固定：2本のレールを同じ形状にすることで枕木との整合を保つ
+  // （jitterを独立して適用すると各レールが別方向に揺れ、枕木がズレる）
+  const rail1 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points, -hw), 0), railOpts);
+  const rail2 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points,  hw), 0), railOpts);
 
   // 枕木：Bezierスプライン上の等アーク長位置に、曲線の接線方向に垂直配置
-  // （レールの外端から外端まで: railGap + railWidth）
+  // レール外端より railWidth 分はみ出す長さにして視覚的に分かりやすくする
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sleepers: any[] = [];
-  const sleeperLen = railGap + railWidth; // レール外端~外端の正確な長さ
+  const sleeperLen = railGap + railWidth * 3; // レール外端からさらにrailWidthだけはみ出す
 
   for (const { pos, tangent } of sampleSplineForSleepers(points, sleeperGap)) {
     const nx = -tangent.y, ny = tangent.x; // 接線に垂直な法線

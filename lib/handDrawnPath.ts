@@ -88,6 +88,67 @@ export function buildRoadObjects(fabric: FabricLib, points: Point[], opts: RoadO
   }
 }
 
+// ── Bezier 評価ヘルパー（枕木のアーク長サンプリング用） ────────
+function evalCubicBezier(p0: Point, cp1: Point, cp2: Point, p1: Point, t: number): Point {
+  const mt = 1 - t;
+  return {
+    x: mt*mt*mt*p0.x + 3*mt*mt*t*cp1.x + 3*mt*t*t*cp2.x + t*t*t*p1.x,
+    y: mt*mt*mt*p0.y + 3*mt*mt*t*cp1.y + 3*mt*t*t*cp2.y + t*t*t*p1.y,
+  };
+}
+
+function evalCubicBezierTangent(p0: Point, cp1: Point, cp2: Point, p1: Point, t: number): Point {
+  const mt = 1 - t;
+  const dx = 3*(mt*mt*(cp1.x-p0.x) + 2*mt*t*(cp2.x-cp1.x) + t*t*(p1.x-cp2.x));
+  const dy = 3*(mt*mt*(cp1.y-p0.y) + 2*mt*t*(cp2.y-cp1.y) + t*t*(p1.y-cp2.y));
+  const len = Math.sqrt(dx*dx + dy*dy) || 1;
+  return { x: dx/len, y: dy/len };
+}
+
+/**
+ * Catmull-Rom スプライン（jitter なし）を等アーク長でサンプリングし、
+ * 枕木配置用の { 位置, 接線 } を返す。
+ * こうすることで、Bezier 曲線で描かれるレールと枕木の方向が一致する。
+ */
+function sampleSplineForSleepers(
+  points: Point[],
+  spacing: number,
+): { pos: Point; tangent: Point }[] {
+  if (points.length < 2) return [];
+  const pts = [points[0], ...points, points[points.length - 1]];
+  const result: { pos: Point; tangent: Point }[] = [];
+  let nextDist = spacing * 0.5; // 先頭オフセット（最初の枕木を少し中に入れる）
+  let totalDist = 0;
+
+  for (let i = 1; i < pts.length - 2; i++) {
+    const p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2];
+    const cp1: Point = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
+    const cp2: Point = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+
+    const STEPS = 60; // セグメントあたりの分割数（精度と速度のバランス）
+    let prevPt = p1;
+
+    for (let s = 1; s <= STEPS; s++) {
+      const t = s / STEPS;
+      const curPt = evalCubicBezier(p1, cp1, cp2, p2, t);
+      const segLen = Math.sqrt((curPt.x - prevPt.x) ** 2 + (curPt.y - prevPt.y) ** 2);
+      const prevTotal = totalDist;
+      totalDist += segLen;
+
+      while (nextDist <= totalDist) {
+        const frac = segLen > 0.001 ? (nextDist - prevTotal) / segLen : 0;
+        const exactT = ((s - 1) + frac) / STEPS;
+        const pos = evalCubicBezier(p1, cp1, cp2, p2, exactT);
+        const tangent = evalCubicBezierTangent(p1, cp1, cp2, p2, exactT);
+        result.push({ pos, tangent });
+        nextDist += spacing;
+      }
+      prevPt = curPt;
+    }
+  }
+  return result;
+}
+
 // ── 線路 ─────────────────────────────────────────────────────
 export type RailwayOpts = {
   color: string;
@@ -115,37 +176,25 @@ export function buildRailwayObjects(
     evented: false,
   };
 
-  const hw   = railGap / 2;
+  const hw    = railGap / 2;
   const rail1 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points, -hw), jitter), railOpts);
   const rail2 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points,  hw), jitter), railOpts);
 
-  // 枕木：ポリライン各セグメントに沿って等間隔に配置
+  // 枕木：Bezierスプライン上の等アーク長位置に、曲線の接線方向に垂直配置
+  // （レールの外端から外端まで: railGap + railWidth）
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sleepers: any[] = [];
-  const sleeperLen = railGap + railWidth * 2.5;
-  let remaining = sleeperGap * 0.5; // 最初のセグメントのオフセット
+  const sleeperLen = railGap + railWidth; // レール外端~外端の正確な長さ
 
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1], curr = points[i];
-    const dx = curr.x - prev.x, dy = curr.y - prev.y;
-    const segLen = Math.sqrt(dx * dx + dy * dy);
-    if (segLen < 0.001) continue;
-    const ux = dx / segLen, uy = dy / segLen; // 接線
-    const nx = -uy,         ny =  ux;         // 法線
-
-    let t = remaining;
-    while (t <= segLen) {
-      const mx = prev.x + ux * t, my = prev.y + uy * t;
-      const sl = new fabric.Line(
-        [mx - nx * sleeperLen / 2, my - ny * sleeperLen / 2,
-         mx + nx * sleeperLen / 2, my + ny * sleeperLen / 2],
-        { stroke: color, strokeWidth: railWidth * 1.1, strokeUniform: true,
-          selectable: false, evented: false },
-      );
-      sleepers.push(sl);
-      t += sleeperGap;
-    }
-    remaining = t - segLen;
+  for (const { pos, tangent } of sampleSplineForSleepers(points, sleeperGap)) {
+    const nx = -tangent.y, ny = tangent.x; // 接線に垂直な法線
+    const sl = new fabric.Line(
+      [pos.x - nx * sleeperLen / 2, pos.y - ny * sleeperLen / 2,
+       pos.x + nx * sleeperLen / 2, pos.y + ny * sleeperLen / 2],
+      { stroke: color, strokeWidth: railWidth * 1.2, strokeUniform: true,
+        selectable: false, evented: false },
+    );
+    sleepers.push(sl);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -278,7 +278,7 @@ export function buildBridgeObjects(
   const cr = parseInt(color.slice(1, 3), 16);
   const cg = parseInt(color.slice(3, 5), 16);
   const cb = parseInt(color.slice(5, 7), 16);
-  const floorFill = `rgba(${cr},${cg},${cb},0.25)`;
+  const floorFill = `rgba(${cr},${cg},${cb},0.20)`;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const floorPath: any = new fabric.Path(floorPathStr, {

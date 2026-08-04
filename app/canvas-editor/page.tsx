@@ -189,14 +189,14 @@ export default function MapEditor() {
 
   // ── 橋プロパティ ───────────────────────────────────────────
   const [bridgeColor,    setBridgeColor]    = useState('#4A3E2E'); // 線路と同色
-  const [bridgeHatchLen, setBridgeHatchLen] = useState(14);
+  const [bridgeHatchLen, setBridgeHatchLen] = useState(10);       // 橋幅: スパンに対して適切な比率
   const [bridgeHatchGap, setBridgeHatchGap] = useState(10);
-  const [bridgeStrokeW,  setBridgeStrokeW]  = useState(2);        // 線路と同幅: 2px
+  const [bridgeStrokeW,  setBridgeStrokeW]  = useState(1.5);      // 側壁: 細め
 
   const bridgeColorRef    = useRef('#4A3E2E');
-  const bridgeHatchLenRef = useRef(14);
+  const bridgeHatchLenRef = useRef(10);
   const bridgeHatchGapRef = useRef(10);
-  const bridgeStrokeWRef  = useRef(2);
+  const bridgeStrokeWRef  = useRef(1.5);
 
   useEffect(() => { bridgeColorRef.current    = bridgeColor;    }, [bridgeColor]);
   useEffect(() => { bridgeHatchLenRef.current = bridgeHatchLen; }, [bridgeHatchLen]);

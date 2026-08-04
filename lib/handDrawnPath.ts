@@ -237,8 +237,8 @@ export function buildRiverObjects(
 export type BridgeOpts = {
   color: string;
   hatchLength: number; // 橋の幅 (px) ─ 2本の側壁間距離
-  hatchGap: number;    // 床板ハッチングの間隔 (px)
-  strokeWidth: number; // 側壁・床板の線幅 (px)
+  hatchGap: number;    // 予約（現在未使用・後方互換のため残す）
+  strokeWidth: number; // 側壁線幅 (px)
 };
 
 export function buildBridgeObjects(
@@ -248,10 +248,14 @@ export function buildBridgeObjects(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any | null {
   if (points.length < 2) return null;
-  const { color, hatchLength, hatchGap, strokeWidth } = opts;
+  const { color, hatchLength, strokeWidth } = opts;
 
   const hw  = hatchLength / 2;    // 中心線から各側壁までの距離
   const ext = hw * 0.4;           // 取り付け部の側壁からのはみ出し量
+
+  // 壁の offset 点列
+  const w1pts = offsetPoints(points, -hw);
+  const w2pts = offsetPoints(points,  hw);
 
   const wallPathOpts = {
     fill: 'transparent', stroke: color, strokeWidth,
@@ -260,22 +264,27 @@ export function buildBridgeObjects(
   };
 
   // 1. 橋の側壁（2本の平行線）── jitter=0 で正確な平行を保つ
-  const wall1 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points, -hw), 0), wallPathOpts);
-  const wall2 = new fabric.Path(jitteredBezierPathStr(offsetPoints(points,  hw), 0), wallPathOpts);
+  const wall1 = new fabric.Path(jitteredBezierPathStr(w1pts, 0), wallPathOpts);
+  const wall2 = new fabric.Path(jitteredBezierPathStr(w2pts, 0), wallPathOpts);
 
-  // 2. 床板ハッチング（2本の側壁の間に垂直線を等間隔に配置）
+  // 2. 橋の床（2本の側壁に囲まれた半透明塗りつぶし）
+  // wall1 を正方向 → wall2 を逆方向でつなぎ closed path を作る
+  const w2rev      = [...w2pts].reverse();
+  const w1pathStr  = jitteredBezierPathStr(w1pts,  0);            // "M x y C ..."
+  const w2revStr   = jitteredBezierPathStr(w2rev,  0).replace(/^M/, 'L'); // "L x y C ..."
+  const floorPathStr = `${w1pathStr} ${w2revStr} Z`;
+
+  // color (#rrggbb) → rgba with 25% opacity
+  const cr = parseInt(color.slice(1, 3), 16);
+  const cg = parseInt(color.slice(3, 5), 16);
+  const cb = parseInt(color.slice(5, 7), 16);
+  const floorFill = `rgba(${cr},${cg},${cb},0.25)`;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const deck: any[] = [];
-  for (const { pos, tangent } of sampleSplineForSleepers(points, hatchGap)) {
-    const nx = -tangent.y, ny = tangent.x; // 接線に垂直な法線
-    const h = new fabric.Line(
-      [pos.x - nx * hw, pos.y - ny * hw,
-       pos.x + nx * hw, pos.y + ny * hw],
-      { stroke: color, strokeWidth: strokeWidth * 0.7, strokeUniform: true,
-        selectable: false, evented: false },
-    );
-    deck.push(h);
-  }
+  const floorPath: any = new fabric.Path(floorPathStr, {
+    fill: floorFill, stroke: 'transparent', strokeWidth: 0,
+    selectable: false, evented: false,
+  });
 
   // 3. 橋の取り付け部（両端の太い垂直線 ─ 岸への接続を表現）
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -303,7 +312,7 @@ export function buildBridgeObjects(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const group: any = new fabric.Group(
-    [wall1, wall2, ...deck, startAbutment, endAbutment],
+    [floorPath, wall1, wall2, startAbutment, endAbutment], // floorPath を最背面に
     { selectable: true },
   );
   group._mapLineType = 'bridge';

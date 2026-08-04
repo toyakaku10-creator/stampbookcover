@@ -250,28 +250,20 @@ export function buildBridgeObjects(
   const { color, hatchLength, hatchGap, strokeWidth } = opts;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const hatches: any[] = [];
-  let remaining = hatchGap * 0.5; // 最初のセグメントのオフセット
 
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1], curr = points[i];
-    const dx = curr.x - prev.x, dy = curr.y - prev.y;
-    const segLen = Math.sqrt(dx * dx + dy * dy);
-    if (segLen < 0.001) continue;
-    const ux = dx / segLen, uy = dy / segLen;
-    const nx = -uy, ny = ux;
-
-    let t = remaining;
-    while (t <= segLen) {
-      const mx = prev.x + ux * t, my = prev.y + uy * t;
-      const h = new fabric.Line(
-        [mx - nx * hatchLength / 2, my - ny * hatchLength / 2,
-         mx + nx * hatchLength / 2, my + ny * hatchLength / 2],
-        { stroke: color, strokeWidth, strokeUniform: true, selectable: false, evented: false },
-      );
-      hatches.push(h);
-      t += hatchGap;
-    }
-    remaining = t - segLen;
+  // Bezierスプライン上の等アーク長位置にサンプリング（線路枕木と同じ方式）
+  for (const { pos, tangent } of sampleSplineForSleepers(points, hatchGap)) {
+    // 接線と法線の中間方向（45°斜め）でハッチを引く
+    // これにより線路の枕木（垂直）と視覚的に区別できる斜線パターンになる
+    // 方向: (tangent + normal) / √2 = (tx - ty, ty + tx) / √2
+    const dx = (tangent.x - tangent.y) / Math.SQRT2;
+    const dy = (tangent.y + tangent.x) / Math.SQRT2;
+    const h = new fabric.Line(
+      [pos.x - dx * hatchLength / 2, pos.y - dy * hatchLength / 2,
+       pos.x + dx * hatchLength / 2, pos.y + dy * hatchLength / 2],
+      { stroke: color, strokeWidth, strokeUniform: true, selectable: false, evented: false },
+    );
+    hatches.push(h);
   }
 
   if (hatches.length === 0) return null;

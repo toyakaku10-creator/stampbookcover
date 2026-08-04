@@ -166,7 +166,7 @@ export default function MapEditor() {
   const [roadDouble,  setRoadDouble]  = useState(false);
   const [railGap,     setRailGap]     = useState(8);
   const [sleeperGap,  setSleeperGap]  = useState(10);
-  const [riverColor,  setRiverColor]  = useState('#8fa6ad'); // 川デフォルト: 青みが強い水色
+  const [riverColor,  setRiverColor]  = useState('#b5d0dc'); // 川デフォルト: 明るい水色
   const [riverWidth,  setRiverWidth]  = useState(9);         // 川デフォルト幅: 9px（太い帯状）
 
   const lineColorRef   = useRef('#d4c4b0');
@@ -175,7 +175,7 @@ export default function MapEditor() {
   const roadDoubleRef  = useRef(false);
   const railGapRef     = useRef(8);
   const sleeperGapRef  = useRef(10);
-  const riverColorRef  = useRef('#8fa6ad');
+  const riverColorRef  = useRef('#b5d0dc');
   const riverWidthRef  = useRef(9);
 
   useEffect(() => { lineColorRef.current   = lineColor;   }, [lineColor]);
@@ -1159,7 +1159,7 @@ export default function MapEditor() {
     if (t === 'road')    { setLineColor('#d4c4b0'); setStrokeWidth(4); }
     if (t === 'railway') { setLineColor('#4A3E2E'); }
     if (t === 'bridge')  { setBridgeColor('#4A3E2E'); }
-    if (t === 'river')   { setRiverColor('#8fa6ad'); setRiverWidth(9); }
+    if (t === 'river')   { setRiverColor('#b5d0dc'); setRiverWidth(9); }
   }, [cancelDrawing]);
 
   // ── JSX ──────────────────────────────────────────────────
@@ -1336,7 +1336,7 @@ export default function MapEditor() {
                     <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
                       <span>太さ</span><span style={{ color: 'var(--accent)' }}>{riverWidth}px</span>
                     </div>
-                    <input type="range" min={1} max={8} step={0.5} value={riverWidth}
+                    <input type="range" min={1} max={30} step={0.5} value={riverWidth}
                       onChange={e => setRiverWidth(Number(e.target.value))} style={{ width: '100%' }} />
                   </div>
                 </>

@@ -160,23 +160,23 @@ export default function MapEditor() {
   const previewObjsRef = useRef<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   // ── 線・共通プロパティ ─────────────────────────────────────
-  const [lineColor,   setLineColor]   = useState('#999999');
+  const [lineColor,   setLineColor]   = useState('#d4c4b0'); // 道路デフォルト: ベージュがかった薄いグレー
   const [strokeWidth, setStrokeWidth] = useState(2);
   const [jitterAmt,   setJitterAmt]   = useState(3);
   const [roadDouble,  setRoadDouble]  = useState(false);
   const [railGap,     setRailGap]     = useState(8);
   const [sleeperGap,  setSleeperGap]  = useState(10);
-  const [riverColor,  setRiverColor]  = useState('#7D97A3');
-  const [riverWidth,  setRiverWidth]  = useState(2);
+  const [riverColor,  setRiverColor]  = useState('#7D97A3'); // 川デフォルト: 淡い水色
+  const [riverWidth,  setRiverWidth]  = useState(4);         // 川デフォルト幅: 4px（帯状表現）
 
-  const lineColorRef   = useRef('#999999');
+  const lineColorRef   = useRef('#d4c4b0');
   const strokeWidthRef = useRef(2);
   const jitterAmtRef   = useRef(3);
   const roadDoubleRef  = useRef(false);
   const railGapRef     = useRef(8);
   const sleeperGapRef  = useRef(10);
   const riverColorRef  = useRef('#7D97A3');
-  const riverWidthRef  = useRef(2);
+  const riverWidthRef  = useRef(4);
 
   useEffect(() => { lineColorRef.current   = lineColor;   }, [lineColor]);
   useEffect(() => { strokeWidthRef.current = strokeWidth; }, [strokeWidth]);
@@ -188,15 +188,15 @@ export default function MapEditor() {
   useEffect(() => { riverWidthRef.current  = riverWidth;  }, [riverWidth]);
 
   // ── 橋プロパティ ───────────────────────────────────────────
-  const [bridgeColor,    setBridgeColor]    = useState('#4A3E2E');
+  const [bridgeColor,    setBridgeColor]    = useState('#4A3E2E'); // 線路と同色
   const [bridgeHatchLen, setBridgeHatchLen] = useState(14);
   const [bridgeHatchGap, setBridgeHatchGap] = useState(10);
-  const [bridgeStrokeW,  setBridgeStrokeW]  = useState(1.5);
+  const [bridgeStrokeW,  setBridgeStrokeW]  = useState(2);        // 線路と同幅: 2px
 
   const bridgeColorRef    = useRef('#4A3E2E');
   const bridgeHatchLenRef = useRef(14);
   const bridgeHatchGapRef = useRef(10);
-  const bridgeStrokeWRef  = useRef(1.5);
+  const bridgeStrokeWRef  = useRef(2);
 
   useEffect(() => { bridgeColorRef.current    = bridgeColor;    }, [bridgeColor]);
   useEffect(() => { bridgeHatchLenRef.current = bridgeHatchLen; }, [bridgeHatchLen]);
@@ -204,13 +204,13 @@ export default function MapEditor() {
   useEffect(() => { bridgeStrokeWRef.current  = bridgeStrokeW;  }, [bridgeStrokeW]);
 
   // ── 広場プロパティ ─────────────────────────────────────────
-  const [plazaColor,   setPlazaColor]   = useState('#999999');
-  const [plazaStrokeW, setPlazaStrokeW] = useState(1.5);
+  const [plazaColor,   setPlazaColor]   = useState('#b3a590'); // 広場デフォルト: グレーがかったベージュ
+  const [plazaStrokeW, setPlazaStrokeW] = useState(2);        // 広場デフォルト幅: 2px
   const [plazaDashLen, setPlazaDashLen] = useState(6);
   const [plazaDashGap, setPlazaDashGap] = useState(4);
 
-  const plazaColorRef   = useRef('#999999');
-  const plazaStrokeWRef = useRef(1.5);
+  const plazaColorRef   = useRef('#b3a590');
+  const plazaStrokeWRef = useRef(2);
   const plazaDashLenRef = useRef(6);
   const plazaDashGapRef = useRef(4);
 
@@ -232,15 +232,15 @@ export default function MapEditor() {
   const finalizePathRef = useRef<() => void>(() => {});
 
   // ── 緑地プロパティ ─────────────────────────────────────────
-  const [greenFill,        setGreenFill]        = useState('#A9B787');
-  const [greenFillOpacity, setGreenFillOpacity] = useState(0.3);
-  const [greenStroke,      setGreenStroke]      = useState('#8A9870');
-  const [greenStrokeW,     setGreenStrokeW]     = useState(1.5);
+  const [greenFill,        setGreenFill]        = useState('#A9B787'); // 緑地塗り: 薄い緑
+  const [greenFillOpacity, setGreenFillOpacity] = useState(0.4);      // 不透明度: 40%
+  const [greenStroke,      setGreenStroke]      = useState('#999999'); // 輪郭線: グレー
+  const [greenStrokeW,     setGreenStrokeW]     = useState(2);        // 輪郭線幅: 2px
 
   const greenFillRef        = useRef('#A9B787');
-  const greenFillOpacityRef = useRef(0.3);
-  const greenStrokeRef      = useRef('#8A9870');
-  const greenStrokeWRef     = useRef(1.5);
+  const greenFillOpacityRef = useRef(0.4);
+  const greenStrokeRef      = useRef('#999999');
+  const greenStrokeWRef     = useRef(2);
 
   useEffect(() => { greenFillRef.current        = greenFill;        }, [greenFill]);
   useEffect(() => { greenFillOpacityRef.current = greenFillOpacity; }, [greenFillOpacity]);
@@ -1156,7 +1156,7 @@ export default function MapEditor() {
   const selectTool = useCallback((t: MapTool) => {
     if (anchorPointsRef.current.length > 0) cancelDrawing();
     setMapTool(t);
-    if (t === 'road')    { setLineColor('#999999'); setStrokeWidth(2); }
+    if (t === 'road')    { setLineColor('#d4c4b0'); setStrokeWidth(2); }
     if (t === 'railway') { setLineColor('#4A3E2E'); }
     if (t === 'bridge')  { setBridgeColor('#4A3E2E'); }
     if (t === 'river')   { setRiverColor('#7D97A3'); setRiverWidth(2); }

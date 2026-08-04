@@ -838,6 +838,11 @@ export default function MapEditor() {
         const tool = mapToolRef.current;
         const pt   = opt.pointer ?? (opt.e ? canvas.getScenePoint(opt.e) : null);
         if (!pt) return;
+        // Fabric.js はドキュメントレベルで mouseup を監視するため、
+        // キャンバス外のボタン（確定ボタン等）クリックでもこのハンドラが発火する。
+        // キャンバス範囲外のイベントを無視して意図しないアンカー追加を防ぐ。
+        const cw = canvas.getWidth(), ch = canvas.getHeight();
+        if (pt.x < 0 || pt.y < 0 || pt.x > cw || pt.y > ch) return;
 
         // Plaza: auto-finalize on 2nd click
         if (tool === 'plaza') {
@@ -889,10 +894,13 @@ export default function MapEditor() {
       });
 
       canvas.on('mouse:move', (opt: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        if (!(DRAWING_TOOLS as readonly string[]).includes(mapToolRef.current)) return;
-        if (anchorPointsRef.current.length === 0) return;
-        const pt = opt.pointer ?? (opt.e ? canvas.getScenePoint(opt.e) : null);
-        if (pt) updatePreview({ x: pt.x, y: pt.y });
+        const tool = mapToolRef.current;
+        // Plaza のみ: 矩形プレビューのためマウス位置を渡す
+        if (tool === 'plaza' && anchorPointsRef.current.length === 1) {
+          const pt = opt.pointer ?? (opt.e ? canvas.getScenePoint(opt.e) : null);
+          if (pt) updatePreview({ x: pt.x, y: pt.y });
+        }
+        // その他の描画ツール: マウス追跡線は描画しない（アンカー間のみ表示）
       });
 
       canvas.on('object:modified', (opt: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any

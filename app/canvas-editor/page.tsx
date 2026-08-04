@@ -1556,7 +1556,7 @@ export default function MapEditor() {
                   <div style={{ ...S.lbl, display: 'flex', justifyContent: 'space-between' }}>
                     <span>線の太さ</span><span style={{ color: 'var(--accent)' }}>{selStrokeW}px</span>
                   </div>
-                  <input type="range" min={1} max={8} step={0.5} value={selStrokeW}
+                  <input type="range" min={1} max={30} step={0.5} value={selStrokeW}
                     onChange={e => { setSelStrokeW(Number(e.target.value)); applySelStrokeW(Number(e.target.value)); }}
                     style={{ width: '100%' }} />
                 </div>
@@ -1597,6 +1597,26 @@ export default function MapEditor() {
                   <div style={{ fontSize: 9, color: '#888', textAlign: 'right' }}>マウスを離すと適用</div>
                 </div>
               )}
+              {/* レイヤー操作 */}
+              <div style={S.lbl}>レイヤー</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                {([
+                  { label: '最前面', fn: (c: any, o: any) => (c.bringObjectToFront ?? c.bringToFront).call(c, o) },
+                  { label: '最背面', fn: (c: any, o: any) => (c.sendObjectToBack  ?? c.sendToBack).call(c, o) },
+                  { label: '前面へ', fn: (c: any, o: any) => (c.bringObjectForward  ?? c.bringForward).call(c, o) },
+                  { label: '背面へ', fn: (c: any, o: any) => (c.sendObjectBackwards ?? c.sendBackwards).call(c, o) },
+                ] as { label: string; fn: (c: any, o: any) => void }[]).map(({ label, fn }) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+                  <button key={label} style={{ ...S.btn(), fontSize: 10, padding: '5px 4px', justifyContent: 'center' }}
+                    onClick={() => {
+                      const c = fabricRef.current; const obj = c?.getActiveObject();
+                      if (!c || !obj) return;
+                      fn(c, obj); c.renderAll(); saveHistory();
+                    }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
               <div style={S.divider} />
             </>
           )}

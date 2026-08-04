@@ -161,22 +161,22 @@ export default function MapEditor() {
 
   // ── 線・共通プロパティ ─────────────────────────────────────
   const [lineColor,   setLineColor]   = useState('#d4c4b0'); // 道路デフォルト: ベージュがかった薄いグレー
-  const [strokeWidth, setStrokeWidth] = useState(2);
+  const [strokeWidth, setStrokeWidth] = useState(4);         // 道路デフォルト幅: 4px
   const [jitterAmt,   setJitterAmt]   = useState(3);
   const [roadDouble,  setRoadDouble]  = useState(false);
   const [railGap,     setRailGap]     = useState(8);
   const [sleeperGap,  setSleeperGap]  = useState(10);
-  const [riverColor,  setRiverColor]  = useState('#7D97A3'); // 川デフォルト: 淡い水色
-  const [riverWidth,  setRiverWidth]  = useState(4);         // 川デフォルト幅: 4px（帯状表現）
+  const [riverColor,  setRiverColor]  = useState('#8fa6ad'); // 川デフォルト: 青みが強い水色
+  const [riverWidth,  setRiverWidth]  = useState(9);         // 川デフォルト幅: 9px（太い帯状）
 
   const lineColorRef   = useRef('#d4c4b0');
-  const strokeWidthRef = useRef(2);
+  const strokeWidthRef = useRef(4);
   const jitterAmtRef   = useRef(3);
   const roadDoubleRef  = useRef(false);
   const railGapRef     = useRef(8);
   const sleeperGapRef  = useRef(10);
-  const riverColorRef  = useRef('#7D97A3');
-  const riverWidthRef  = useRef(4);
+  const riverColorRef  = useRef('#8fa6ad');
+  const riverWidthRef  = useRef(9);
 
   useEffect(() => { lineColorRef.current   = lineColor;   }, [lineColor]);
   useEffect(() => { strokeWidthRef.current = strokeWidth; }, [strokeWidth]);
@@ -1156,10 +1156,10 @@ export default function MapEditor() {
   const selectTool = useCallback((t: MapTool) => {
     if (anchorPointsRef.current.length > 0) cancelDrawing();
     setMapTool(t);
-    if (t === 'road')    { setLineColor('#d4c4b0'); setStrokeWidth(2); }
+    if (t === 'road')    { setLineColor('#d4c4b0'); setStrokeWidth(4); }
     if (t === 'railway') { setLineColor('#4A3E2E'); }
     if (t === 'bridge')  { setBridgeColor('#4A3E2E'); }
-    if (t === 'river')   { setRiverColor('#7D97A3'); setRiverWidth(2); }
+    if (t === 'river')   { setRiverColor('#8fa6ad'); setRiverWidth(9); }
   }, [cancelDrawing]);
 
   // ── JSX ──────────────────────────────────────────────────

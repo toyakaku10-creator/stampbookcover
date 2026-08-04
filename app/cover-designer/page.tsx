@@ -2954,15 +2954,22 @@ export default function CoverDesignerPage() {
 
               {/* レイヤー */}
               <div style={S.sectionTitle}>レイヤー</div>
-              <div style={{ padding: '0 12px 8px', display: 'flex', gap: 4 }}>
-                <button onClick={() => {
-                  const c = fabricRef.current; const obj = c?.getActiveObject();
-                  if (c && obj) { (c.bringObjectToFront ?? c.bringToFront).call(c, obj); c.renderAll(); }
-                }} style={{ ...S.btn(), flex: 1, fontSize: 10, padding: '5px 4px' }}>前面</button>
-                <button onClick={() => {
-                  const c = fabricRef.current; const obj = c?.getActiveObject();
-                  if (c && obj) { (c.sendObjectToBack ?? c.sendToBack).call(c, obj); c.renderAll(); }
-                }} style={{ ...S.btn(), flex: 1, fontSize: 10, padding: '5px 4px' }}>背面</button>
+              <div style={{ padding: '0 12px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+                {([
+                  { label: '最前面', fn: (c: any, o: any) => (c.bringObjectToFront  ?? c.bringToFront).call(c, o) },
+                  { label: '最背面', fn: (c: any, o: any) => (c.sendObjectToBack    ?? c.sendToBack).call(c, o) },
+                  { label: '前面へ', fn: (c: any, o: any) => (c.bringObjectForward  ?? c.bringForward).call(c, o) },
+                  { label: '背面へ', fn: (c: any, o: any) => (c.sendObjectBackwards ?? c.sendBackwards).call(c, o) },
+                ] as { label: string; fn: (c: any, o: any) => void }[]).map(({ label, fn }) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+                  <button key={label} style={{ ...S.btn(), fontSize: 10, padding: '5px 4px', justifyContent: 'center' }}
+                    onClick={() => {
+                      const c = fabricRef.current; const obj = c?.getActiveObject();
+                      if (!c || !obj) return;
+                      fn(c, obj); c.renderAll(); saveHistory();
+                    }}>
+                    {label}
+                  </button>
+                ))}
               </div>
 
               {/* 複製・削除 */}
